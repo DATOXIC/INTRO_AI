@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>n-Puzzle BFS Interactive Debugger</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Configuration Header -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">BFS</span>
+        <div class="brand-text">
+          <h1>n-Puzzle BFS Debugger</h1>
+          <span class="brand-sub">Python Core · Frontier &amp; Explored Inspector</span>
+        </div>
+      </div>
+
+      <div class="config-controls">
+        <div class="control-group" role="group" aria-label="Kích thước bảng">
+          <span class="control-label">Kích thước</span>
+          <div class="segmented" id="sizeSelector">
+            <button type="button" class="seg-btn" data-size="2">2×2</button>
+            <button type="button" class="seg-btn active" data-size="3">3×3</button>
+            <button type="button" class="seg-btn" data-size="4">4×4</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label class="control-label" for="presetSelect">Đề bài mẫu</label>
+          <select id="presetSelect" class="select-input"></select>
+        </div>
+
+        <div class="control-group shuffle-group">
+          <label class="control-label" for="shuffleSteps">Xáo trộn</label>
+          <div class="inline-pair">
+            <input id="shuffleSteps" type="number" class="num-input" min="1" max="30" value="5" aria-label="Số bước xáo trộn" />
+            <button type="button" id="shuffleBtn" class="btn btn-secondary">Xáo trộn</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">Tùy biến</span>
+          <button type="button" id="editBoardBtn" class="btn btn-secondary">Sửa bảng</button>
+        </div>
+
+        <div class="control-divider" aria-hidden="true"></div>
+
+        <div class="control-group toggles-group">
+          <label class="toggle-chip" title="Tắt để chuyển sang Tree Search (không lọc trạng thái trùng — xem cây bùng nổ)">
+            <input type="checkbox" id="graphSearchToggle" checked />
+            <span>Graph Search</span>
+          </label>
+          <label class="toggle-chip" title="Kiểm tra đích ngay lúc sinh con (chuẩn slide BFS) thay vì đợi lúc dequeue">
+            <input type="checkbox" id="earlyGoalToggle" checked />
+            <span>Early Goal</span>
+          </label>
+        </div>
+
+        <div class="control-group">
+          <label class="control-label" for="maxNodesInput">Max nodes</label>
+          <input id="maxNodesInput" type="number" class="num-input num-wide" min="10" max="3000" step="50" value="300" />
+        </div>
+
+        <button type="button" id="runBtn" class="btn btn-primary">Chạy BFS</button>
+      </div>
+    </header>
+
+    <!-- Solvability / Error Alert Banner -->
+    <section id="alertBanner" class="alert-banner hidden" role="status" aria-live="polite"></section>
+
+    <!-- Primary Debugger Playback Strip -->
+    <section class="playback-bar" aria-label="Điều khiển bước chạy">
+      <div class="playback-buttons">
+        <button type="button" id="firstBtn" class="btn btn-icon" title="Về bước đầu (Home)" aria-label="Về bước đầu">|&lt;</button>
+        <button type="button" id="macroPrevBtn" class="btn btn-secondary btn-sm" title="Step-Over Lùi — về nút mở rộng trước (Shift + ←)">Step-Over ◀</button>
+        <button type="button" id="microPrevBtn" class="btn btn-secondary btn-sm" title="Step-Into Lùi — lùi 1 thao tác nhỏ (←)">◀ Lùi</button>
+        <button type="button" id="playBtn" class="btn btn-primary btn-play" title="Phát / Tạm dừng (Space)">▶ Phát</button>
+        <button type="button" id="microNextBtn" class="btn btn-secondary btn-sm" title="Step-Into Tới — tiến 1 thao tác nhỏ (→)">Tiến ▶</button>
+        <button type="button" id="macroNextBtn" class="btn btn-secondary btn-sm" title="Step-Over Tới — nhảy tới lần dequeue tiếp theo (Shift + →)">▶ Step-Over</button>
+        <button type="button" id="lastBtn" class="btn btn-icon" title="Tới bước cuối (End)" aria-label="Tới bước cuối">&gt;|</button>
+      </div>
+
+      <div class="timeline-wrap">
+        <input type="range" id="stepSlider" min="0" max="0" value="0" aria-label="Thanh tiến trình bước" />
+        <div class="step-meta">
+          <span id="stepCounter" class="mono-strong">Bước 0 / 0</span>
+          <span id="macroCounter" class="meta-muted">Macro 0 / 0</span>
+        </div>
+      </div>
+
+      <div class="speed-wrap">
+        <label for="speedSelect" class="meta-muted">Tốc độ</label>
+        <select id="speedSelect" class="select-input select-sm">
+          <option value="1200">0.5× (Chậm)</option>
+          <option value="650" selected>1× (Vừa)</option>
+          <option value="280">2× (Nhanh)</option>
+          <option value="90">4× (Rất nhanh)</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Live Event Narration Bar -->
+    <section class="event-strip" aria-live="polite">
+      <span id="eventBadge" class="status-pill pill-neutral">SẴN SÀNG</span>
+      <p id="eventMessage" class="event-text">Nhấn "Chạy BFS" để bắt đầu phân tích từng bước.</p>
+      <span id="solvabilityChip" class="solvability-chip"></span>
+    </section>
+
+    <!-- Main 2-Column Debugger Workspace -->
+    <main class="workspace">
+      <!-- Left Column: Board Inspector + Live Python Code -->
+      <section class="left-column">
+        <!-- Board Diff & State Inspector -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Soi trạng thái bảng (Board Inspector)</h2>
+            <span id="boardHeaderTag" class="mono-tag"></span>
+          </div>
+
+          <div class="boards-stage">
+            <div class="board-slot">
+              <div class="board-slot-label">
+                <span>Đang xét (<code>cur_node</code>)</span>
+                <span id="curNodeBadge" class="mono-pill pill-indigo">—</span>
+              </div>
+              <div id="curBoardContainer" class="puzzle-board"></div>
+            </div>
+
+            <div class="move-arrow-col" aria-hidden="true">
+              <div id="moveArrowBadge" class="move-arrow-badge">→</div>
+              <span id="moveLabel" class="move-label"></span>
+            </div>
+
+            <div class="board-slot">
+              <div class="board-slot-label">
+                <span>Nhánh con thử (<code>child</code>)</span>
+                <span id="candNodeBadge" class="mono-pill pill-neutral">—</span>
+              </div>
+              <div id="candBoardContainer" class="puzzle-board puzzle-board-empty"></div>
+            </div>
+
+            <div class="board-slot board-slot-goal">
+              <div class="board-slot-label">
+                <span>Đích (<code>target</code>)</span>
+              </div>
+              <div id="goalBoardContainer" class="puzzle-board puzzle-board-mini"></div>
+            </div>
+          </div>
+
+          <div id="collisionNotice" class="collision-notice hidden"></div>
+
+          <div class="state-metrics-grid" id="stateMetricsGrid">
+            <div class="mini-metric">
+              <span class="mini-metric-label">Depth (d)</span>
+              <span id="mDepth" class="mini-metric-val">—</span>
+            </div>
+            <div class="mini-metric">
+              <span class="mini-metric-label">Parent</span>
+              <span id="mParent" class="mini-metric-val">—</span>
+            </div>
+            <div class="mini-metric">
+              <span class="mini-metric-label">Inversions</span>
+              <span id="mInversions" class="mini-metric-val">—</span>
+            </div>
+            <div class="mini-metric">
+              <span class="mini-metric-label">Manhattan (h₁)</span>
+              <span id="mManhattan" class="mini-metric-val">—</span>
+            </div>
+            <div class="mini-metric">
+              <span class="mini-metric-label">Sai vị trí (h₀)</span>
+              <span id="mMisplaced" class="mini-metric-val">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Python BFS Code Highlighter -->
+        <div class="card code-card">
+          <div class="card-header">
+            <h2>Code Python BFS đang chạy</h2>
+            <span id="modeSummaryTag" class="mono-tag">Graph · Early Goal</span>
+          </div>
+          <div id="codeLinesContainer" class="code-viewer" role="region" aria-label="Mã nguồn BFS"></div>
+          <div class="vars-strip">
+            <span class="vars-label">Biến cục bộ:</span>
+            <div id="localVarsContainer" class="vars-pills"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Tabbed Deep Inspector -->
+      <section class="right-column card">
+        <div class="tabs-bar" role="tablist">
+          <button type="button" class="tab-btn active" role="tab" aria-selected="true" data-tab="queues">
+            Frontier &amp; Explored <span id="tabQueuesCount" class="tab-count">0 · 0</span>
+          </button>
+          <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="tree">
+            Cây tìm kiếm <span id="tabTreeCount" class="tab-count">0</span>
+          </button>
+          <button type="button" class="tab-btn" role="tab" aria-selected="false" data-tab="telemetry">
+            Thống kê &amp; Biểu đồ
+          </button>
+        </div>
+
+        <!-- Pinned Clicked Node Drawer -->
+        <div id="pinnedNodeBar" class="pinned-drawer hidden">
+          <div class="pinned-header">
+            <strong id="pinnedTitle">Chi tiết nút</strong>
+            <div class="pinned-actions">
+              <button type="button" id="jumpCreatedBtn" class="btn btn-secondary btn-xs">Tới bước sinh</button>
+              <button type="button" id="jumpExpandedBtn" class="btn btn-secondary btn-xs">Tới bước mở rộng</button>
+              <button type="button" id="closePinnedBtn" class="btn btn-icon btn-xs" aria-label="Đóng">✕</button>
+            </div>
+          </div>
+          <div class="pinned-body">
+            <div id="pinnedBoard" class="puzzle-board puzzle-board-mini"></div>
+            <div class="pinned-details">
+              <div id="pinnedMeta" class="pinned-meta"></div>
+              <div id="pinnedLineage" class="pinned-lineage"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 1: Frontier & Explored -->
+        <div id="tab-queues" class="tab-panel active" role="tabpanel">
+          <!-- Frontier Panel -->
+          <div class="queue-section">
+            <div class="section-bar">
+              <div class="section-title-row">
+                <span class="dot dot-amber"></span>
+                <h3>frontier (Hàng đợi FIFO)</h3>
+                <span id="frontierCountBadge" class="count-pill pill-amber">0</span>
+              </div>
+              <div class="fifo-hints">
+                <span class="hint-out">◀ Đầu hàng (dequeue)</span>
+                <span class="hint-in">Cuối hàng (enqueue) ◀</span>
+              </div>
+              <input id="frontierFilter" type="search" class="filter-input" placeholder="Lọc #id hoặc d=2..." aria-label="Lọc frontier" />
+            </div>
+            <div id="frontierList" class="mini-cards-grid frontier-grid"></div>
+          </div>
+
+          <!-- Explored Panel -->
+          <div class="queue-section">
+            <div class="section-bar">
+              <div class="section-title-row">
+                <span class="dot dot-sky"></span>
+                <h3>explored (Tập trạng thái đã duyệt)</h3>
+                <span id="exploredCountBadge" class="count-pill pill-sky">0</span>
+              </div>
+              <input id="exploredFilter" type="search" class="filter-input" placeholder="Lọc #id hoặc d=2..." aria-label="Lọc explored" />
+            </div>
+            <div id="exploredList" class="mini-cards-grid explored-grid"></div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Interactive Search Tree -->
+        <div id="tab-tree" class="tab-panel" role="tabpanel">
+          <div class="tree-toolbar">
+            <div class="tree-zoom-controls">
+              <button type="button" id="treeZoomOut" class="btn btn-secondary btn-xs">−</button>
+              <button type="button" id="treeZoomFit" class="btn btn-secondary btn-xs">Vừa khung</button>
+              <button type="button" id="treeZoomIn" class="btn btn-secondary btn-xs">+</button>
+            </div>
+            <label class="toggle-chip toggle-sm">
+              <input type="checkbox" id="showPrunedToggle" checked />
+              <span>Hiện nhánh bị cắt (trùng lặp)</span>
+            </label>
+            <div class="tree-legend">
+              <span><i class="dot dot-indigo"></i>Đang xét</span>
+              <span><i class="dot dot-amber"></i>Frontier</span>
+              <span><i class="dot dot-sky"></i>Explored</span>
+              <span><i class="dot dot-rose"></i>Trùng (cắt)</span>
+              <span><i class="dot dot-emerald"></i>Lời giải</span>
+            </div>
+          </div>
+          <div id="treeViewport" class="tree-viewport" aria-label="Cây tìm kiếm BFS tương tác">
+            <svg id="treeSvg" class="tree-svg"></svg>
+          </div>
+        </div>
+
+        <!-- Tab 3: Telemetry & Memory Chart -->
+        <div id="tab-telemetry" class="tab-panel" role="tabpanel">
+          <div class="kpi-grid">
+            <div class="kpi-card">
+              <span class="kpi-label">Nút đã mở rộng (Expanded)</span>
+              <span id="kpiExpanded" class="kpi-val">0</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Nút đã sinh (Generated)</span>
+              <span id="kpiGenerated" class="kpi-val">0</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Bỏ qua (trùng Explored)</span>
+              <span id="kpiSkipExplored" class="kpi-val kpi-rose">0</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Bỏ qua (trùng Frontier)</span>
+              <span id="kpiSkipFrontier" class="kpi-val kpi-amber">0</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Đỉnh bộ nhớ (Max |Frontier|)</span>
+              <span id="kpiMaxFrontier" class="kpi-val kpi-indigo">0</span>
+            </div>
+            <div class="kpi-card">
+              <span class="kpi-label">Độ dài lời giải / Nhánh TB</span>
+              <span id="kpiSolutionBranch" class="kpi-val kpi-emerald">—</span>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="section-bar">
+              <h3>Tăng trưởng bộ nhớ: |frontier| và |explored| theo bước</h3>
+              <div class="tree-legend">
+                <span><i class="dot dot-amber"></i>|frontier| (Hàng đợi)</span>
+                <span><i class="dot dot-sky"></i>|explored| (Đã duyệt)</span>
+              </div>
+            </div>
+            <svg id="memoryChartSvg" class="chart-svg" viewBox="0 0 640 210" preserveAspectRatio="none"></svg>
+          </div>
+
+          <div class="solvability-card">
+            <h3>Kiểm chứng toán học tính giải được (Solvability)</h3>
+            <p id="solvFormula" class="solv-formula"></p>
+            <p id="solvExplanation" class="solv-detail"></p>
+          </div>
+
+          <div id="solutionStripCard" class="solution-card hidden">
+            <h3>Chuỗi lời giải tối ưu (click từng bước để xem)</h3>
+            <div id="solutionStrip" class="solution-strip"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Board Editor Modal -->
+  <div id="editorModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 id="editorTitle">Chỉnh sửa bảng n-Puzzle</h2>
+        <button type="button" id="closeEditorBtn" class="btn btn-icon" aria-label="Đóng">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="editor-tabs">
+          <button type="button" class="seg-btn active" data-target="start">Bảng xuất phát (Start)</button>
+          <button type="button" class="seg-btn" data-target="target">Bảng đích (Goal)</button>
+        </div>
+
+        <div class="editor-mode-row">
+          <label class="toggle-chip">
+            <input type="radio" name="editMode" value="slide" checked />
+            <span>Trượt ô (click cạnh ô 0)</span>
+          </label>
+          <label class="toggle-chip">
+            <input type="radio" name="editMode" value="manual" />
+            <span>Nhập số tự do (có thể tạo bảng vô nghiệm)</span>
+          </label>
+        </div>
+
+        <div id="editorBoardWrap" class="editor-board-wrap"></div>
+        <div id="editorStatus" class="editor-status"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" id="resetGoalBtn" class="btn btn-secondary">Đặt về Goal chuẩn</button>
+        <div class="modal-footer-right">
+          <button type="button" id="cancelEditorBtn" class="btn btn-secondary">Hủy</button>
+          <button type="button" id="applyEditorBtn" class="btn btn-primary">Áp dụng &amp; Chạy BFS</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
