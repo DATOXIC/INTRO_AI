@@ -1,4 +1,4 @@
-"""Local HTTP server for the n-Puzzle BFS Interactive Debugger."""
+"""Local HTTP server for the Search Interactive Debugger (BFS / DFS on n-Puzzle and Vacuum Robot)."""
 
 from __future__ import annotations
 
@@ -13,15 +13,20 @@ from typing import Any
 from urllib.parse import urlparse
 
 from bfs_core import (
+    ALGORITHMS,
     ALLOWED_SIZES,
-    BFS_trace,
     analyze_solvability,
-    get_bfs_source_lines,
     get_presets,
+    get_source_lines,
     make_goal_board,
+    make_npuzzle_domain,
+    search_trace,
     shuffle_solvable,
     validate_board,
 )
+from vacuum_world import make_vacuum_domain, validate_vacuum_state
+
+PROBLEMS = ("npuzzle", "vacuum")
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 MAX_BODY_BYTES = 65_536
@@ -55,7 +60,7 @@ def _parse_int(value: Any, name: str, default: int, min_val: int, max_val: int) 
 class DebuggerRequestHandler(BaseHTTPRequestHandler):
     """HTTP request handler serving static UI assets and JSON BFS APIs."""
 
-    server_version = "NPuzzleBFSDebugger/1.0"
+    server_version = "SearchDebugger/2.0"
 
     def log_message(self, format: str, *args: Any) -> None:
         """Keep terminal logs concise."""
@@ -111,8 +116,10 @@ class DebuggerRequestHandler(BaseHTTPRequestHandler):
                 HTTPStatus.OK,
                 {
                     "allowed_sizes": list(ALLOWED_SIZES),
+                    "problems": list(PROBLEMS),
+                    "algorithms": list(ALGORITHMS),
                     "presets": get_presets(),
-                    "default_source_lines": get_bfs_source_lines(True, True),
+                    "default_source_lines": get_source_lines("bfs", True, True),
                 },
             )
             return
@@ -148,6 +155,29 @@ class DebuggerRequestHandler(BaseHTTPRequestHandler):
 
     def _handle_solve(self, payload: dict[str, Any]) -> None:
         try:
+            problem_kind = payload.get("problem", "npuzzle")
+            if problem_kind not in PROBLEMS:
+                raise ValueError(f"Tham số 'problem' phải thuộc {PROBLEMS}.")
+            algorithm = payload.get("algorithm", "bfs")
+            if algorithm not in ALGORITHMS:
+                raise ValueError(f"Tham số 'algorithm' phải thuộc {ALGORITHMS}.")
+            graph_search = _parse_bool(payload.get("graph_search"), "graph_search", True)
+            early_goal_test = _parse_bool(payload.get("early_goal_test"), "early_goal_test", True)
+            max_nodes = _parse_int(payload.get("max_nodes"), "max_nodes", 300, 1, 3000)
+            force_run = _parse_bool(payload.get("force_run"), "force_run", False)
+
+            if problem_kind == "vacuum":
+                domain = make_vacuum_domain(validate_vacuum_state(payload.get("start_state")))
+                result = search_trace(
+                    domain,
+                    algorithm=algorithm,
+                    graph_search=graph_search,
+                    early_goal_test=early_goal_test,
+                    max_nodes=max_nodes,
+                )
+                self._send_json(HTTPStatus.OK, result)
+                return
+
             raw_start = payload.get("start_board")
             if raw_start is None:
                 raise ValueError("Thiếu trường 'start_board'.")
@@ -160,10 +190,6 @@ class DebuggerRequestHandler(BaseHTTPRequestHandler):
                 if raw_target is not None
                 else make_goal_board(size)
             )
-            graph_search = _parse_bool(payload.get("graph_search"), "graph_search", True)
-            early_goal_test = _parse_bool(payload.get("early_goal_test"), "early_goal_test", True)
-            max_nodes = _parse_int(payload.get("max_nodes"), "max_nodes", 300, 1, 3000)
-            force_run = _parse_bool(payload.get("force_run"), "force_run", False)
 
             solvability = analyze_solvability(start_board, target_board)
             if not solvability["solvable"] and not force_run:
@@ -171,6 +197,8 @@ class DebuggerRequestHandler(BaseHTTPRequestHandler):
                     HTTPStatus.OK,
                     {
                         "status": "unsolvable_blocked",
+                        "problem": "npuzzle",
+                        "algorithm": algorithm,
                         "size": size,
                         "start_board": [list(r) for r in start_board],
                         "target_board": [list(r) for r in target_board],
@@ -180,7 +208,7 @@ class DebuggerRequestHandler(BaseHTTPRequestHandler):
                             "max_nodes": max_nodes,
                         },
                         "solvability": solvability,
-                        "source_lines": get_bfs_source_lines(graph_search, early_goal_test),
+                        "source_lines": get_source_lines(algorithm, graph_search, early_goal_test),
                         "nodes": [],
                         "steps": [],
                         "solution_ids": None,
@@ -189,9 +217,9 @@ class DebuggerRequestHandler(BaseHTTPRequestHandler):
                 )
                 return
 
-            result = BFS_trace(
-                start_board,
-                target_board,
+            result = search_trace(
+                make_npuzzle_domain(start_board, target_board),
+                algorithm=algorithm,
                 graph_search=graph_search,
                 early_goal_test=early_goal_test,
                 max_nodes=max_nodes,
@@ -263,7 +291,13 @@ def create_server(host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPSer
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Chạy ứng dụng n-Puzzle BFS Interactive Debugger.")
+    # Terminal Windows hay dùng cp1252: ép UTF-8 để không sập khi in tiếng Việt.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
+
+    parser = argparse.ArgumentParser(description="Chạy ứng dụng Search Interactive Debugger (BFS/DFS).")
     parser.add_argument("--host", default="127.0.0.1", help="Địa chỉ lắng nghe (mặc định: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8765, help="Cổng HTTP (mặc định: 8765)")
     parser.add_argument("--no-browser", action="store_true", help="Không tự động mở trình duyệt")
@@ -276,7 +310,7 @@ def main() -> None:
 
     actual_port = server.server_address[1]
     url = f"http://{args.host}:{actual_port}/"
-    print(f"n-Puzzle BFS Debugger đang chạy tại: {url}")
+    print(f"Search Debugger đang chạy tại: {url}")
     print("Nhấn Ctrl+C để dừng server.")
 
     if not args.no_browser:
