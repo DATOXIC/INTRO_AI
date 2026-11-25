@@ -12,21 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from bfs_core import (
-    ALGORITHMS,
-    ALLOWED_SIZES,
-    analyze_solvability,
-    get_presets,
-    get_source_lines,
-    make_goal_board,
-    make_npuzzle_domain,
-    search_trace,
-    shuffle_solvable,
-    validate_board,
-)
-from vacuum_world import make_vacuum_domain, validate_vacuum_state
-
-PROBLEMS = ("npuzzle", "vacuum")
+from api import PROBLEMS, handle  # noqa: F401  (PROBLEMS giữ lại cho tương thích)
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 MAX_BODY_BYTES = 65_536
@@ -37,24 +23,6 @@ STATIC_ROUTES: dict[str, tuple[str, str]] = {
     "/styles.css": ("styles.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "application/javascript; charset=utf-8"),
 }
-
-
-def _parse_bool(value: Any, name: str, default: bool) -> bool:
-    if value is None:
-        return default
-    if not isinstance(value, bool):
-        raise ValueError(f"Tham số '{name}' phải là kiểu boolean.")
-    return value
-
-
-def _parse_int(value: Any, name: str, default: int, min_val: int, max_val: int) -> int:
-    if value is None:
-        return default
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(f"Tham số '{name}' phải là số nguyên.")
-    if not (min_val <= value <= max_val):
-        raise ValueError(f"Tham số '{name}' phải nằm trong khoảng [{min_val}, {max_val}].")
-    return value
 
 
 class DebuggerRequestHandler(BaseHTTPRequestHandler):
@@ -111,21 +79,9 @@ class DebuggerRequestHandler(BaseHTTPRequestHandler):
             self._send_bytes(HTTPStatus.OK, content_type, file_path.read_bytes())
             return
 
-        if path == "/api/presets":
-            self._send_json(
-                HTTPStatus.OK,
-                {
-                    "allowed_sizes": list(ALLOWED_SIZES),
-                    "problems": list(PROBLEMS),
-                    "algorithms": list(ALGORITHMS),
-                    "presets": get_presets(),
-                    "default_source_lines": get_source_lines("bfs", True, True),
-                },
-            )
-            return
-
-        if path == "/api/health":
-            self._send_json(HTTPStatus.OK, {"status": "ok"})
+        if path.startswith("/api/"):
+            status, body = handle("GET", path)
+            self._send_json(HTTPStatus(status), body)
             return
 
         self._send_json(HTTPStatus.NOT_FOUND, {"error": f"Đường dẫn không tồn tại: {path}"})
@@ -139,147 +95,8 @@ class DebuggerRequestHandler(BaseHTTPRequestHandler):
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
             return
 
-        if path == "/api/solve":
-            self._handle_solve(payload)
-            return
-
-        if path == "/api/shuffle":
-            self._handle_shuffle(payload)
-            return
-
-        if path == "/api/check":
-            self._handle_check(payload)
-            return
-
-        self._send_json(HTTPStatus.NOT_FOUND, {"error": f"Endpoint không tồn tại: {path}"})
-
-    def _handle_solve(self, payload: dict[str, Any]) -> None:
-        try:
-            problem_kind = payload.get("problem", "npuzzle")
-            if problem_kind not in PROBLEMS:
-                raise ValueError(f"Tham số 'problem' phải thuộc {PROBLEMS}.")
-            algorithm = payload.get("algorithm", "bfs")
-            if algorithm not in ALGORITHMS:
-                raise ValueError(f"Tham số 'algorithm' phải thuộc {ALGORITHMS}.")
-            graph_search = _parse_bool(payload.get("graph_search"), "graph_search", True)
-            early_goal_test = _parse_bool(payload.get("early_goal_test"), "early_goal_test", True)
-            max_nodes = _parse_int(payload.get("max_nodes"), "max_nodes", 300, 1, 3000)
-            force_run = _parse_bool(payload.get("force_run"), "force_run", False)
-
-            if problem_kind == "vacuum":
-                domain = make_vacuum_domain(validate_vacuum_state(payload.get("start_state")))
-                result = search_trace(
-                    domain,
-                    algorithm=algorithm,
-                    graph_search=graph_search,
-                    early_goal_test=early_goal_test,
-                    max_nodes=max_nodes,
-                )
-                self._send_json(HTTPStatus.OK, result)
-                return
-
-            raw_start = payload.get("start_board")
-            if raw_start is None:
-                raise ValueError("Thiếu trường 'start_board'.")
-            size = _parse_int(payload.get("size"), "size", len(raw_start) if isinstance(raw_start, list) else 3, 2, 4)
-            start_board = validate_board(raw_start, expected_size=size)
-
-            raw_target = payload.get("target_board")
-            target_board = (
-                validate_board(raw_target, expected_size=size)
-                if raw_target is not None
-                else make_goal_board(size)
-            )
-
-            solvability = analyze_solvability(start_board, target_board)
-            if not solvability["solvable"] and not force_run:
-                self._send_json(
-                    HTTPStatus.OK,
-                    {
-                        "status": "unsolvable_blocked",
-                        "problem": "npuzzle",
-                        "algorithm": algorithm,
-                        "size": size,
-                        "start_board": [list(r) for r in start_board],
-                        "target_board": [list(r) for r in target_board],
-                        "config": {
-                            "graph_search": graph_search,
-                            "early_goal_test": early_goal_test,
-                            "max_nodes": max_nodes,
-                        },
-                        "solvability": solvability,
-                        "source_lines": get_source_lines(algorithm, graph_search, early_goal_test),
-                        "nodes": [],
-                        "steps": [],
-                        "solution_ids": None,
-                        "summary": None,
-                    },
-                )
-                return
-
-            result = search_trace(
-                make_npuzzle_domain(start_board, target_board),
-                algorithm=algorithm,
-                graph_search=graph_search,
-                early_goal_test=early_goal_test,
-                max_nodes=max_nodes,
-            )
-            self._send_json(HTTPStatus.OK, result)
-        except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-
-    def _handle_shuffle(self, payload: dict[str, Any]) -> None:
-        try:
-            size = _parse_int(payload.get("size"), "size", 3, 2, 4)
-            if size not in ALLOWED_SIZES:
-                raise ValueError(f"Kích thước phải thuộc {ALLOWED_SIZES}.")
-            steps = _parse_int(payload.get("steps"), "steps", 5, 0, 50)
-            raw_seed = payload.get("seed")
-            seed = _parse_int(raw_seed, "seed", 0, -2_147_483_648, 2_147_483_647) if raw_seed is not None else None
-
-            raw_target = payload.get("target_board")
-            target_board = (
-                validate_board(raw_target, expected_size=size)
-                if raw_target is not None
-                else make_goal_board(size)
-            )
-            shuffled = shuffle_solvable(target_board, steps=steps, seed=seed)
-            solvability = analyze_solvability(shuffled, target_board)
-            self._send_json(
-                HTTPStatus.OK,
-                {
-                    "size": size,
-                    "start_board": [list(r) for r in shuffled],
-                    "target_board": [list(r) for r in target_board],
-                    "solvability": solvability,
-                },
-            )
-        except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
-
-    def _handle_check(self, payload: dict[str, Any]) -> None:
-        try:
-            raw_start = payload.get("start_board")
-            if raw_start is None:
-                raise ValueError("Thiếu trường 'start_board'.")
-            start_board = validate_board(raw_start)
-            size = len(start_board)
-            raw_target = payload.get("target_board")
-            target_board = (
-                validate_board(raw_target, expected_size=size)
-                if raw_target is not None
-                else make_goal_board(size)
-            )
-            self._send_json(
-                HTTPStatus.OK,
-                {
-                    "valid": True,
-                    "size": size,
-                    "solvability": analyze_solvability(start_board, target_board),
-                },
-            )
-        except ValueError as exc:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"valid": False, "error": str(exc)})
+        status, body = handle("POST", path, payload)
+        self._send_json(HTTPStatus(status), body)
 
 
 def create_server(host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPServer:

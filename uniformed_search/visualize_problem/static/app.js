@@ -203,8 +203,78 @@
     return out;
   }
 
+  // ───────── Kết nối tới "backend" Python ─────────
+  // Hai chế độ, tự nhận biết:
+  //  - "server":  có server.py chạy cục bộ  -> gọi HTTP /api/...
+  //  - "pyodide": không có server (GitHub Pages) -> chạy chính mã Python trong trình duyệt
+  let backendMode = null;
+  let backendProbe = null;
+  let worker = null;
+  let workerSeq = 0;
+  const workerPending = new Map();
+
+  function detectBackend() {
+    if (!backendProbe) {
+      backendProbe = fetch("api/health", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => (d && d.status === "ok" ? "server" : "pyodide"))
+        .catch(() => "pyodide")
+        .then((mode) => {
+          backendMode = mode;
+          return mode;
+        });
+    }
+    return backendProbe;
+  }
+
+  function getWorker() {
+    if (worker) return worker;
+    worker = new Worker("pyodide_worker.js");
+    worker.onmessage = (event) => {
+      const msg = event.data;
+      if (msg.progress) {
+        showAlert("", "Đang chuẩn bị", msg.progress);
+        return;
+      }
+      const pending = workerPending.get(msg.id);
+      if (!pending) return;
+      workerPending.delete(msg.id);
+      if (msg.fatal) {
+        pending.reject(new Error(msg.fatal));
+        return;
+      }
+      if (msg.status >= 400) {
+        pending.reject(new Error((msg.body && msg.body.error) || `Lỗi ${msg.status}`));
+        return;
+      }
+      pending.resolve(msg.body);
+    };
+    worker.onerror = (event) => {
+      const err = new Error(event.message || "Worker Python gặp lỗi.");
+      workerPending.forEach((p) => p.reject(err));
+      workerPending.clear();
+      worker = null;
+    };
+    return worker;
+  }
+
+  function callPyodide(url, options) {
+    const method = (options.method || "GET").toUpperCase();
+    const payload = options.body ? JSON.parse(options.body) : {};
+    const path = url.startsWith("/") ? url : "/" + url;
+    return new Promise((resolve, reject) => {
+      const id = ++workerSeq;
+      workerPending.set(id, { resolve, reject });
+      getWorker().postMessage({ id, method, path, payload });
+    });
+  }
+
   async function apiJson(url, options = {}) {
-    const resp = await fetch(url, {
+    const mode = backendMode || (await detectBackend());
+    if (mode === "pyodide") {
+      return callPyodide(url, options);
+    }
+    const resp = await fetch(url.replace(/^\//, ""), {
       headers: { "Content-Type": "application/json" },
       ...options,
     });
@@ -2784,8 +2854,9 @@
       state.presets = data.presets || [];
       updateAlgoLabels();
       await setProblem("npuzzle");
+      hideAlert();
     } catch (err) {
-      showAlert("", "Không kết nối được tới Python Server", err.message);
+      showAlert("", "Không chạy được phần Python", err.message);
     }
   }
 
