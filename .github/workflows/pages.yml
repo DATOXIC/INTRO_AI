@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Run tests
-        run: python -m unittest test_bfs_core
+        run: python -m unittest discover -p "test_*.py"
       - name: Build static site
         run: python build_site.py
       - uses: actions/configure-pages@v5

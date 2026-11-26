@@ -14,13 +14,21 @@
     check_root: { text: "KIỂM TRA GỐC", cls: "pill-neutral" },
     init: { text: "ENQUEUE NÚT GỐC", cls: "pill-emerald" },
     init_explored: { text: "TẠO TẬP EXPLORED", cls: "pill-sky" },
+    init_best: { text: "TẠO best_cost", cls: "pill-sky" },
     dequeue: { text: "POP KHỎI HÀNG ĐỢI", cls: "pill-amber" },
     check_late: { text: "KIỂM TRA ĐÍCH", cls: "pill-neutral" },
+    check_stale: { text: "KIỂM TRA NÚT CŨ", cls: "pill-neutral" },
+    skip_stale: { text: "NÚT CŨ · BỎ QUA", cls: "pill-rose" },
     explore: { text: "GHI VÀO EXPLORED", cls: "pill-sky" },
     gen_child: { text: "SINH NÚT CON", cls: "pill-indigo" },
     check_pass: { text: "KHÔNG TRÙNG → MỚI", cls: "pill-emerald" },
     skip_explored: { text: "BỎ QUA · ĐÃ CÓ TRONG EXPLORED", cls: "pill-rose" },
     skip_frontier: { text: "BỎ QUA · ĐÃ CÓ TRONG FRONTIER", cls: "pill-rose" },
+    dup_frontier: { text: "ĐÃ CÓ TRONG FRONTIER → SO CHI PHÍ", cls: "pill-amber" },
+    better: { text: "ĐƯỜNG RẺ HƠN", cls: "pill-emerald" },
+    not_better: { text: "KHÔNG RẺ HƠN · BỎ QUA", cls: "pill-rose" },
+    replace: { text: "THAY NÚT TRONG FRONTIER", cls: "pill-emerald" },
+    update_best: { text: "CẬP NHẬT best_cost", cls: "pill-sky" },
     check_goal: { text: "KIỂM TRA ĐÍCH", cls: "pill-neutral" },
     enqueue: { text: "ENQUEUE VÀO CUỐI HÀNG ĐỢI", cls: "pill-emerald" },
     goal_init: { text: "ĐÃ TỚI ĐÍCH", cls: "pill-emerald" },
@@ -30,22 +38,39 @@
     failure: { text: "VÔ NGHIỆM", cls: "pill-rose" },
   };
 
-  // DFS dùng ngăn xếp nên đổi từ ngữ của ba sự kiện liên quan tới frontier.
+  // DFS dùng ngăn xếp, UCS dùng hàng đợi ưu tiên: đổi từ ngữ của ba sự kiện liên quan tới frontier.
   const DFS_BADGES = {
     init: "PUSH NÚT GỐC",
     dequeue: "POP KHỎI NGĂN XẾP",
     enqueue: "PUSH LÊN ĐỈNH NGĂN XẾP",
   };
+  const PQ_BADGES = {
+    init: "ENQUEUE NÚT GỐC",
+    dequeue: "POP NÚT g NHỎ NHẤT",
+    enqueue: "CHÈN VÀO FRONTIER THEO g",
+  };
+
+  const isUcs = (algorithm) => algorithm === "ucs" || algorithm === "ucs_fast";
 
   function badgeFor(ev, algorithm) {
     const base = EVENT_BADGES[ev] || { text: ev.toUpperCase(), cls: "pill-neutral" };
     if (algorithm === "dfs" && DFS_BADGES[ev]) return { ...base, text: DFS_BADGES[ev] };
+    if (isUcs(algorithm) && PQ_BADGES[ev]) return { ...base, text: PQ_BADGES[ev] };
     return base;
   }
 
+  const PQ_LABELS = {
+    kind: "hàng đợi ưu tiên (g nhỏ nhất ra trước)",
+    out: "◀ pop g NHỎ NHẤT",
+    in: "chèn theo g ▶",
+    container: "Hàng đợi ưu tiên",
+    next: "g nhỏ nhất",
+  };
   const ALGO_LABELS = {
     bfs: { name: "BFS", kind: "hàng đợi FIFO", out: "◀ pop ở ĐẦU", in: "enqueue ở CUỐI ▶", container: "Hàng đợi", next: "Ra tiếp" },
     dfs: { name: "DFS", kind: "ngăn xếp LIFO", out: "đáy", in: "push & pop ở ĐỈNH ▶", container: "Ngăn xếp", next: "Pop tiếp" },
+    ucs: { name: "UCS", ...PQ_LABELS },
+    ucs_fast: { name: "UCS tối ưu", ...PQ_LABELS },
   };
 
   const state = {
@@ -53,7 +78,8 @@
     problem: "npuzzle",
     algorithm: "bfs",
     vacStart: { robot: 0, dirt: [true, true] },
-    compare: { enabled: false, runs: [], sides: [], maxTick: 0 },
+    vacuumRooms: [2, 3, 4, 5, 6],
+    compare: { enabled: false, runs: [], sides: [], maxTick: 0, algos: ["bfs", "dfs"] },
     stepMode: "micro",
     size: 3,
     startBoard: [[1, 2, 3], [5, 0, 6], [4, 7, 8]],
@@ -92,8 +118,17 @@
     problemSelector: document.getElementById("problemSelector"),
     algoSelector: document.getElementById("algoSelector"),
     vacRobotSelector: document.getElementById("vacRobotSelector"),
-    vacDirtA: document.getElementById("vacDirtA"),
-    vacDirtB: document.getElementById("vacDirtB"),
+    vacRoomsSelector: document.getElementById("vacRoomsSelector"),
+    vacDirtToggles: document.getElementById("vacDirtToggles"),
+    costLegend: document.getElementById("costLegend"),
+    kpiCost: document.getElementById("kpiCost"),
+    ucsOptionNote: document.getElementById("ucsOptionNote"),
+    legendStale: document.getElementById("legendStale"),
+    legendCost: document.getElementById("legendCost"),
+    cmpAlgoA: document.getElementById("cmpAlgoA"),
+    cmpAlgoB: document.getElementById("cmpAlgoB"),
+    cmpLegendDepth: document.getElementById("cmpLegendDepth"),
+    cmpLegendFrontier: document.getElementById("cmpLegendFrontier"),
     codeTitle: document.getElementById("codeTitle"),
     frontierKind: document.getElementById("frontierKind"),
     axisOut: document.getElementById("axisOut"),
@@ -360,26 +395,30 @@
     }
   }
 
-  const VAC_ROOMS = ["A", "B"];
+  const ROOM_NAMES = "ABCDEF";
+  const roomCols = (n) => (n <= 4 ? n : 3);
+  const vacGoalText = (n) => (n > 2 ? "Tất cả các phòng đều sạch" : "Cả hai phòng đều sạch");
 
-  // Vẽ thế giới Vacuum: hai phòng cạnh nhau, robot (🤖) ở một phòng, phòng bẩn có bụi (🟤).
+  // Vẽ thế giới Vacuum: một dãy n phòng, robot (🤖) ở một phòng, phòng bẩn có bụi (🟤).
   function renderVacuum(container, st, opts = {}) {
+    const n = st.dirt.length;
     container.innerHTML = "";
     container.classList.remove("board-popped", "board-new", "board-dup", "board-goal", "puzzle-board-empty", "size-2", "size-3", "size-4");
     container.classList.add("vac-board");
+    container.classList.toggle("dense", n >= 4);
     if (opts.boardCls) container.classList.add(opts.boardCls);
-    container.style.gridTemplateColumns = "repeat(2, auto)";
+    container.style.gridTemplateColumns = `repeat(${roomCols(n)}, auto)`;
 
     const changed = new Set(opts.changed || []);
     const dup = Boolean(opts.isCollision);
-    VAC_ROOMS.forEach((name, i) => {
+    st.dirt.forEach((dirty, i) => {
       const room = document.createElement("div");
-      room.className = "room " + (st.dirt[i] ? "room-dirty" : "room-clean");
+      room.className = "room " + (dirty ? "room-dirty" : "room-clean");
       if (changed.has(`dirt${i}`)) room.classList.add(dup ? "room-changed-dup" : "room-changed");
 
       const label = document.createElement("span");
       label.className = "room-name";
-      label.textContent = `Phòng ${name}`;
+      label.textContent = n >= 4 ? ROOM_NAMES[i] : `Phòng ${ROOM_NAMES[i]}`;
 
       const body = document.createElement("span");
       body.className = "room-body";
@@ -390,8 +429,8 @@
         body.appendChild(robot);
       }
       const dirt = document.createElement("span");
-      dirt.className = st.dirt[i] ? "vac-dirt" : "vac-clean";
-      dirt.textContent = st.dirt[i] ? "🟤🟤" : "✨";
+      dirt.className = dirty ? "vac-dirt" : "vac-clean";
+      dirt.textContent = dirty ? "🟤🟤" : "✨";
       body.appendChild(dirt);
 
       room.append(label, body);
@@ -468,13 +507,15 @@
   }
 
   function buildMiniVacuum(st) {
+    const n = st.dirt.length;
     const wrap = document.createElement("div");
-    wrap.className = "mini-board-cell vac";
-    wrap.style.gridTemplateColumns = "repeat(2, auto)";
-    VAC_ROOMS.forEach((name, i) => {
+    wrap.className = "mini-board-cell vac" + (n >= 4 ? " dense" : "");
+    wrap.style.gridTemplateColumns = `repeat(${roomCols(n)}, auto)`;
+    st.dirt.forEach((dirty, i) => {
       const cell = document.createElement("div");
-      cell.className = "mini-cell vac-cell" + (st.dirt[i] ? " dirty" : "");
-      cell.textContent = `${name}${st.robot === i ? "🤖" : ""}${st.dirt[i] ? "🟤" : ""}`;
+      cell.className = "mini-cell vac-cell" + (dirty ? " dirty" : "");
+      // Nhiều phòng thì chữ không đủ chỗ: bụi thể hiện bằng nền nâu của ô, ô chỉ ghi tên phòng và robot.
+      cell.textContent = `${ROOM_NAMES[i]}${st.robot === i ? "🤖" : ""}${dirty && n < 4 ? "🟤" : ""}`;
       wrap.appendChild(cell);
     });
     return wrap;
@@ -499,7 +540,7 @@
   function renderCodePanel(sourceLines, activeLine, eventType, localVars) {
     els.codeLinesContainer.innerHTML = "";
     const activeCls =
-      eventType === "skip_explored" || eventType === "skip_frontier" || eventType === "failure"
+      ["skip_explored", "skip_frontier", "not_better", "skip_stale", "failure"].includes(eventType)
         ? "active-rose"
         : eventType === "goal_early" || eventType === "goal_late" || eventType === "goal_init"
         ? "active-emerald"
@@ -534,20 +575,20 @@
     }
   }
 
-  function createNodeCard(node, { cls = "", tag = null, clickable = true } = {}) {
+  function createNodeCard(node, { cls = "", tag = null, clickable = true, cost = false } = {}) {
     const card = document.createElement("div");
     card.className = "node-card" + (cls ? ` ${cls}` : "");
     card.title =
       node.parent_id === null
         ? `Nút gốc #${node.id}`
-        : `Nút #${node.id} · tầng ${node.depth} · ${node.action} từ #${node.parent_id}`;
+        : `Nút #${node.id} · tầng ${node.depth} · g = ${node.path_cost} · ${node.action} từ #${node.parent_id}`;
 
     const top = document.createElement("div");
     top.className = "node-card-top";
     const idSpan = document.createElement("span");
     idSpan.textContent = `#${node.id}`;
     const depthSpan = document.createElement("span");
-    depthSpan.textContent = `d${node.depth}`;
+    depthSpan.textContent = cost ? `g${node.path_cost}` : `d${node.depth}`;
     top.append(idSpan, depthSpan);
     card.append(top, buildMiniBoard(node.state));
 
@@ -600,7 +641,7 @@
   const QUEUE_TAIL = 4;
   const EXPLORED_TAIL = 6;
 
-  function renderCardStrip(box, ids, nodes, { head, tail, optsFor, prepend = null, append = null, emptyText }) {
+  function renderCardStrip(box, ids, nodes, { head, tail, optsFor, prepend = null, append = null, emptyText, cost = false }) {
     box.innerHTML = "";
     if (prepend) box.appendChild(prepend);
     if (!ids.length) {
@@ -626,7 +667,7 @@
         box.appendChild(gap);
       }
       const opts = optsFor(ids[i], i);
-      const card = createNodeCard(nodes[ids[i]], opts);
+      const card = createNodeCard(nodes[ids[i]], { ...opts, cost });
       box.appendChild(card);
       if (opts.highlight) focusEl = card;
       prev = i;
@@ -638,30 +679,36 @@
   function renderFrontierStrip(step, nodes, algorithm) {
     const labels = ALGO_LABELS[algorithm] || ALGO_LABELS.bfs;
     const dfs = algorithm === "dfs";
+    const cost = isUcs(algorithm);
     const ev = step.event_type;
     const popId = ev === "dequeue" ? step.cur_id : null;
-    const newId = ev === "enqueue" || ev === "init" ? step.candidate_id : null;
+    const staleId = ev === "skip_stale" ? step.cur_id : null;
+    const newId = ev === "enqueue" || ev === "init" || ev === "replace" ? step.candidate_id : null;
     const dupId = ev === "skip_frontier" ? step.collision_id : null;
+    // UCS: nút cùng trạng thái đang chờ sẵn trong frontier (đối tượng để so chi phí).
+    const rivalId = ["dup_frontier", "better", "not_better"].includes(ev) ? step.collision_id : null;
     const ids = step.frontier_ids;
     // Hàng đợi: nút kế tiếp ở ĐẦU (trái). Ngăn xếp: nút kế tiếp ở ĐỈNH (phải).
     const nextIdx = dfs ? ids.length - 1 : 0;
 
-    // "Bóng" của nút vừa pop: nằm đúng chỗ nó vừa rời khỏi frontier.
-    const ghost =
+    // "Bóng" của nút vừa pop (hoặc nút cũ vừa bị bỏ qua): nằm đúng chỗ nó vừa rời khỏi frontier.
+    const ghostSpec =
       popId !== null
-        ? createNodeCard(nodes[popId], {
-            cls: "card-popped",
-            tag: { text: "POP ↓", cls: "pill-amber" },
-            clickable: false,
-          })
+        ? { id: popId, cls: "card-popped", tag: { text: "POP ↓", cls: "pill-amber" } }
+        : staleId !== null
+        ? { id: staleId, cls: "card-collision", tag: { text: "NÚT CŨ ✕", cls: "pill-rose" } }
         : null;
+    const ghost = ghostSpec
+      ? createNodeCard(nodes[ghostSpec.id], { cls: ghostSpec.cls, tag: ghostSpec.tag, clickable: false, cost })
+      : null;
 
     renderCardStrip(els.frontierList, ids, nodes, {
       head: QUEUE_HEAD,
       tail: QUEUE_TAIL,
+      cost,
       prepend: dfs ? null : ghost,
       append: dfs ? ghost : null,
-      emptyText: `${labels.container} ${popId !== null ? "vừa cạn." : "đang rỗng."}`,
+      emptyText: `${labels.container} ${ghost ? "vừa cạn." : "đang rỗng."}`,
       optsFor: (id, i) => {
         const q = activePredictQuestion();
         if (q && q.type === "pop") {
@@ -672,20 +719,33 @@
           return {};
         }
         if (id === dupId) return { cls: "card-collision", tag: { text: "TRÙNG!", cls: "pill-rose" }, highlight: true };
-        if (id === newId) return { cls: "card-new", tag: { text: "MỚI", cls: "pill-emerald" }, highlight: true };
-        if (i === nextIdx && popId === null) return { cls: "card-front", tag: { text: labels.next, cls: "pill-amber" } };
+        if (id === rivalId) {
+          if (ev === "better") return { cls: "card-collision", tag: { text: "g CAO HƠN → BỊ THAY", cls: "pill-rose" }, highlight: true };
+          if (ev === "not_better") return { cls: "card-front", tag: { text: "GIỮ NÚT NÀY", cls: "pill-emerald" }, highlight: true };
+          return { cls: "card-front", tag: { text: "CÙNG TRẠNG THÁI", cls: "pill-amber" }, highlight: true };
+        }
+        if (id === newId) {
+          const text = ev === "replace" ? `THAY #${step.collision_id}` : "MỚI";
+          return { cls: "card-new", tag: { text, cls: "pill-emerald" }, highlight: true };
+        }
+        const node = nodes[id];
+        if (node.superseded_step !== null && node.superseded_step !== undefined && node.superseded_step <= step.index) {
+          return { cls: "card-stale", tag: { text: "CŨ", cls: "pill-neutral" } };
+        }
+        if (i === nextIdx && popId === null && staleId === null) return { cls: "card-front", tag: { text: labels.next, cls: "pill-amber" } };
         return {};
       },
     });
   }
 
-  function renderExploredStrip(step, nodes, cfg) {
+  function renderExploredStrip(step, nodes, cfg, algorithm) {
     const ev = step.event_type;
     const newId = ev === "explore" ? step.cur_id : null;
     const dupId = ev === "skip_explored" ? step.collision_id : null;
     renderCardStrip(els.exploredList, step.explored_ids, nodes, {
       head: 0,
       tail: EXPLORED_TAIL,
+      cost: isUcs(algorithm),
       emptyText: cfg.graph_search ? "Chưa có trạng thái nào được mở rộng xong." : "Tree Search: không có tập explored!",
       optsFor: (id) => {
         if (id === dupId) return { cls: "card-collision", tag: { text: "TRÙNG!", cls: "pill-rose" }, highlight: true };
@@ -737,7 +797,11 @@
     }
     const node = state.trace.nodes[state.pinnedNodeId];
     els.pinnedNodeBar.classList.remove("hidden");
-    els.pinnedTitle.textContent = `Chi tiết nút #${node.id}${node.is_duplicate ? ` (Bị cắt — trùng #${node.duplicate_of} ở ${node.duplicate_reason})` : ""}`;
+    const notes = [];
+    if (node.is_duplicate) notes.push(`Bị cắt — trùng #${node.duplicate_of} ở ${node.duplicate_reason}`);
+    if (node.superseded_by !== null && node.superseded_by !== undefined) notes.push(`bị thay bởi #${node.superseded_by}`);
+    if (node.replaces !== null && node.replaces !== undefined) notes.push(`thay thế #${node.replaces}`);
+    els.pinnedTitle.textContent = `Chi tiết nút #${node.id}${notes.length ? ` (${notes.join("; ")})` : ""}`;
     renderState(els.pinnedBoard, node.state, {
       targetBoard: state.trace.target_board,
       movedTile: node.moved_tile,
@@ -748,6 +812,7 @@
     els.pinnedMeta.innerHTML = "";
     const metaItems = [
       `depth=${node.depth}`,
+      `g=${node.path_cost}`,
       `action=${node.action || "ROOT"}`,
       `parent=${node.parent_id !== null ? "#" + node.parent_id : "None"}`,
     ];
@@ -818,6 +883,9 @@
     const step = trace.steps[stepIdx];
     const nodes = trace.nodes;
     const showPruned = o.showPruned !== false;
+    const ucs = isUcs(trace.algorithm);
+    // UCS: nút cũ bị thay bằng nút rẻ hơn cùng trạng thái (từ bước thay trở đi).
+    const isSuperseded = (n) => n.superseded_step !== null && n.superseded_step !== undefined && stepIdx >= n.superseded_step;
 
     // Nút con chỉ bị coi là "trùng" từ bước kiểm tra trở đi (không tiết lộ trước).
     const isDupNow = (n) => n.is_duplicate && stepIdx >= (n.resolved_step ?? n.created_step);
@@ -905,7 +973,7 @@
 
       if (n.action && showText) {
         const lbl = svgEl("text", { x: (p1.x + p2.x) / 2 + 4, y: (p1.y + p2.y) / 2 + 3, "font-size": 10, fill: isSolEdge ? "#047857" : "#64748b" });
-        lbl.textContent = MOVE_ARROWS[n.action] || "";
+        lbl.textContent = (MOVE_ARROWS[n.action] || "") + (ucs ? n.step_cost : "");
         gRoot.appendChild(lbl);
       }
     }
@@ -934,9 +1002,11 @@
         fill = "#4f46e5"; stroke = "#312e81"; textFill = "#ffffff"; sw = 2.4;
       } else if (n.id === step.collision_id) {
         fill = "#ffe4e6"; stroke = "#e11d48"; textFill = "#9f1239"; sw = 2.5;
+      } else if (isSuperseded(n)) {
+        fill = "#f1f5f9"; stroke = "#94a3b8"; textFill = "#64748b"; dashed = true;
       } else if (isDupNow(n)) {
         fill = "#fff1f2"; stroke = "#f43f5e"; textFill = "#be123c"; dashed = true;
-      } else if (n.id === step.candidate_id && n.parent_id !== null && step.event_type === "enqueue") {
+      } else if (n.id === step.candidate_id && n.parent_id !== null && (step.event_type === "enqueue" || step.event_type === "replace")) {
         fill = "#ecfdf5"; stroke = "#10b981"; textFill = "#065f46"; sw = 2.2;
       } else if (n.id === step.candidate_id && n.parent_id !== null) {
         fill = "#fef9c3"; stroke = "#eab308"; textFill = "#713f12"; sw = 2.2;
@@ -957,7 +1027,13 @@
           "font-family": "var(--font-mono)", fill: textFill,
         });
         text.textContent = isDupNow(n) ? `#${n.id}✕` : `#${n.id}`;
+        if (isSuperseded(n)) text.setAttribute("text-decoration", "line-through");
         g.appendChild(text);
+        if (ucs && tf.scale >= 0.5) {
+          const gl = svgEl("text", { x: pt.x, y: pt.y + 29, "text-anchor": "middle", "font-size": 8.5, "font-family": "var(--font-mono)", fill: "#64748b" });
+          gl.textContent = `g=${n.path_cost}`;
+          g.appendChild(gl);
+        }
 
         // Huy hiệu thứ tự mở rộng: nút nào được pop trước, nút nào sau
         if (n.expanded_step !== null && n.expanded_step !== undefined && n.expanded_step <= stepIdx && ranks.has(n.id)) {
@@ -971,7 +1047,7 @@
       const title = svgEl("title");
       title.textContent = isDupNow(n)
         ? `Nút #${n.id} (BỊ CẮT - trùng #${n.duplicate_of} trong ${n.duplicate_reason})`
-        : `Nút #${n.id} | tầng ${n.depth} | ${n.action || "ROOT"}${ranks.has(n.id) && n.expanded_step <= stepIdx ? ` | mở rộng thứ ${ranks.get(n.id)}` : ""}${n.manhattan != null ? " | Manhattan=" + n.manhattan : ""}`;
+        : `Nút #${n.id} | tầng ${n.depth} | ${n.action || "ROOT"}${ucs ? ` | g=${n.path_cost}` : ""}${ranks.has(n.id) && n.expanded_step <= stepIdx ? ` | mở rộng thứ ${ranks.get(n.id)}` : ""}${n.manhattan != null ? " | Manhattan=" + n.manhattan : ""}`;
       g.appendChild(title);
       gRoot.appendChild(g);
     }
@@ -1071,7 +1147,12 @@
     if (childShown) {
       const cand = nodes[step.candidate_id];
       const from = keyOf(cand.parent_id);
-      const tone = ev.startsWith("skip") ? "rose" : ev === "enqueue" || ev === "goal_early" ? "emerald" : "indigo";
+      const tone =
+        ev.startsWith("skip") || ev === "not_better"
+          ? "rose"
+          : ["enqueue", "goal_early", "replace", "better"].includes(ev)
+          ? "emerald"
+          : "indigo";
       active = { from, action: cand.action, to: keyOf(cand.id), tone };
     }
     const candKey = active ? active.to : null;
@@ -1325,7 +1406,7 @@
       const mini = buildMiniBoard(node.state);
       const foot = document.createElement("div");
       foot.className = "node-card-foot";
-      foot.textContent = node.action ? `${MOVE_ARROWS[node.action]} ${node.action}` : "Xuất phát";
+      foot.textContent = node.action ? `${MOVE_ARROWS[node.action]} ${node.action} · g${node.path_cost}` : "Xuất phát";
 
       card.append(top, mini, foot);
       card.addEventListener("click", () => {
@@ -1344,6 +1425,14 @@
     check_root: ["cur"],
     init: ["frontier"],
     init_explored: ["explored"],
+    init_best: [],
+    check_stale: ["frontier", "cur"],
+    skip_stale: ["frontier", "cur"],
+    dup_frontier: ["check", "child", "frontier"],
+    better: ["check", "child", "frontier"],
+    not_better: ["check", "child", "frontier"],
+    replace: ["frontier", "child"],
+    update_best: ["check", "child"],
     dequeue: ["frontier", "cur"],
     check_late: ["cur"],
     explore: ["explored", "cur"],
@@ -1360,9 +1449,10 @@
     failure: [],
   };
 
-  const ROOT_EVENTS = new Set(["init_root", "check_root", "init", "init_explored"]);
+  const ROOT_EVENTS = new Set(["init_root", "check_root", "init", "init_explored", "init_best"]);
   const CHILD_EVENTS = new Set([
     "gen_child", "check_pass", "check_goal", "skip_explored", "skip_frontier", "enqueue", "goal_early",
+    "dup_frontier", "better", "not_better", "replace", "update_best",
   ]);
 
   function applyFocus(eventType) {
@@ -1380,80 +1470,135 @@
     frontier: "<code>child</code> chưa có trong <code>frontier</code>",
     goal: "<code>child</code> chưa phải <b>đích</b>",
   };
+  const CHECK_UCS_HTML = {
+    ucs: {
+      explored: "<code>child</code> chưa có trong <code>explored</code>",
+      frontier: "<code>child</code> chưa có trong <code>frontier</code>",
+      goal: "nếu đã có: <code>g(child)</code> &lt; <code>g</code> của nút cũ",
+    },
+    ucs_fast: {
+      explored: "<code>child</code> chưa có trong <code>explored</code>",
+      frontier: "<code>child</code> mới, hoặc <code>g(child)</code> &lt; <code>best_cost</code>",
+      goal: "",
+    },
+  };
 
-  function setCheckRow(el, kind, status, html) {
+  function setCheckRow(el, status, html) {
     el.dataset.state = status === "hit" ? "pass" : status;
     el.querySelector(".check-icon").textContent = CHECK_ICONS[status];
-    el.querySelector(".check-text").innerHTML = html || CHECK_DEFAULT_HTML[kind];
+    el.querySelector(".check-text").innerHTML = html;
   }
 
-  // Bảng kiểm tra phản chiếu đúng các dòng `if child not in explored and ...` / `if is_goal(child)`.
-  function renderChecklist(step, cfg) {
+  // Bảng kiểm tra phản chiếu đúng các dòng `if child not in explored and ...` / `if is_goal(child)`
+  // (UCS: ba hàng là: chưa explored / chưa trong frontier / rẻ hơn nút cũ).
+  function renderChecklist(step, cfg, algorithm) {
+    const ucs = isUcs(algorithm);
+    const fast = algorithm === "ucs_fast";
+    const rows = ucs ? CHECK_UCS_HTML[algorithm] : CHECK_DEFAULT_HTML;
     els.chkExplored.classList.toggle("hidden", !cfg.graph_search);
     els.chkFrontier.classList.toggle("hidden", !cfg.graph_search);
-    els.chkGoal.classList.toggle("hidden", !cfg.early_goal_test);
+    els.chkGoal.classList.toggle("hidden", ucs ? fast : !cfg.early_goal_test);
 
     const st = { explored: "idle", frontier: "idle", goal: "idle" };
     let goalHtml = null;
     let verdict = null;
+    const wait = (text) => ({ cls: "verdict-wait", text });
+    const bad = (text, soi) => ({ cls: "verdict-bad", text, soi });
+    const good = (text) => ({ cls: "verdict-good", text });
 
     switch (step.event_type) {
       case "gen_child":
-        verdict = { cls: "verdict-wait", text: "Vừa sinh nút con — sắp kiểm tra…" };
+        verdict = wait("Vừa sinh nút con — sắp kiểm tra…");
         break;
       case "check_pass":
         st.explored = "pass";
-        st.frontier = "pass";
-        verdict = { cls: "verdict-wait", text: "Là trạng thái MỚI" };
+        st.frontier = fast ? "idle" : "pass";
+        verdict = wait(fast ? "Chưa explored → kiểm tra best_cost" : "Là trạng thái MỚI");
         break;
       case "skip_explored":
         st.explored = "fail";
         st.frontier = "skipped";
         st.goal = "skipped";
-        verdict = { cls: "verdict-bad", text: "✗ BỎ QUA nút con", soi: step.collision_id };
+        verdict = bad("✗ BỎ QUA nút con", step.collision_id);
         break;
       case "skip_frontier":
         st.explored = "pass";
         st.frontier = "fail";
         st.goal = "skipped";
-        verdict = { cls: "verdict-bad", text: "✗ BỎ QUA nút con", soi: step.collision_id };
+        verdict = bad("✗ BỎ QUA nút con", step.collision_id);
+        break;
+      case "dup_frontier":
+        st.explored = "pass";
+        st.frontier = "fail";
+        verdict = wait("Đã có trong frontier → so tiếp chi phí g");
+        break;
+      case "better":
+        st.explored = "pass";
+        st.frontier = fast ? "pass" : "fail";
+        st.goal = "pass";
+        verdict = wait(fast ? "Mới hoặc rẻ hơn → ghi best_cost rồi thêm vào" : "Rẻ hơn nút cũ → sẽ THAY nút cũ");
+        break;
+      case "not_better":
+        st.explored = "pass";
+        st.frontier = "fail";
+        st.goal = "fail";
+        verdict = bad("✗ BỎ QUA nút con (không rẻ hơn)", step.collision_id);
+        break;
+      case "update_best":
+        st.explored = "pass";
+        st.frontier = "pass";
+        verdict = wait("Đã ghi best_cost mới");
+        break;
+      case "replace":
+        st.explored = "pass";
+        st.frontier = "fail";
+        st.goal = "pass";
+        verdict = good("✓ ĐÃ THAY nút cũ trong frontier");
         break;
       case "check_goal":
         st.explored = "pass";
         st.frontier = "pass";
         st.goal = "pass";
-        verdict = { cls: "verdict-wait", text: "Chưa phải đích → sẽ enqueue" };
+        verdict = wait("Chưa phải đích → sẽ enqueue");
         break;
       case "enqueue":
         st.explored = "pass";
         st.frontier = "pass";
-        st.goal = "pass";
-        verdict = { cls: "verdict-good", text: "✓ ĐÃ THÊM vào cuối hàng đợi" };
+        st.goal = ucs ? "skipped" : "pass";
+        verdict = good(
+          ucs ? "✓ ĐÃ THÊM vào frontier (xếp theo g)" : algorithm === "dfs" ? "✓ ĐÃ PUSH lên đỉnh ngăn xếp" : "✓ ĐÃ THÊM vào cuối hàng đợi"
+        );
         break;
       case "goal_early":
         st.explored = "pass";
         st.frontier = "pass";
         st.goal = "hit";
         goalHtml = "<code>child</code> <b>LÀ ĐÍCH!</b>";
-        verdict = { cls: "verdict-good", text: "Tìm thấy lời giải!" };
+        verdict = good("Tìm thấy lời giải!");
         break;
       case "check_late":
-        verdict = { cls: "verdict-wait", text: "cur_node chưa phải đích → tiếp tục mở rộng" };
+        verdict = wait("cur_node chưa phải đích → tiếp tục mở rộng");
+        break;
+      case "check_stale":
+        verdict = wait("Không phải nút cũ → mở rộng");
+        break;
+      case "skip_stale":
+        verdict = bad("✗ NÚT CŨ → bỏ qua (continue)", step.collision_id);
         break;
       case "goal_late":
-        verdict = { cls: "verdict-good", text: "cur_node LÀ ĐÍCH — tìm thấy lời giải!" };
+        verdict = good("cur_node LÀ ĐÍCH — tìm thấy lời giải!");
         break;
       case "dequeue":
       case "explore":
-        verdict = { cls: "verdict-wait", text: "Chờ sinh nút con…" };
+        verdict = wait("Chờ sinh nút con…");
         break;
       default:
         break;
     }
 
-    setCheckRow(els.chkExplored, "explored", st.explored);
-    setCheckRow(els.chkFrontier, "frontier", st.frontier);
-    setCheckRow(els.chkGoal, "goal", st.goal, goalHtml);
+    setCheckRow(els.chkExplored, st.explored, rows.explored);
+    setCheckRow(els.chkFrontier, st.frontier, rows.frontier);
+    setCheckRow(els.chkGoal, st.goal, goalHtml || rows.goal);
 
     els.checkVerdict.innerHTML = "";
     if (verdict) {
@@ -1465,11 +1610,28 @@
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "btn btn-secondary btn-xs";
-        btn.textContent = `Soi nút trùng #${verdict.soi}`;
+        btn.textContent = ucs ? `Soi nút #${verdict.soi}` : `Soi nút trùng #${verdict.soi}`;
         btn.addEventListener("click", () => selectPinnedNode(verdict.soi));
         els.checkVerdict.appendChild(btn);
       }
     }
+  }
+
+  const nodeBadge = (node, ucs) => `#${node.id} · ${ucs ? `g=${node.path_cost}` : `d=${node.depth}`}`;
+
+  // Bảng giá hành động (chỉ hiện với UCS): ↑ ↓ = 1 · ← → = 2
+  function renderCostLegend(trace) {
+    const costs = trace && trace.move_costs ? trace.move_costs : null;
+    const show = Boolean(costs) && Object.keys(costs).length > 0 && isUcs(trace.algorithm);
+    els.costLegend.classList.toggle("hidden", !show);
+    if (!show) return;
+    const groups = new Map();
+    for (const [move, c] of Object.entries(costs)) {
+      if (!groups.has(c)) groups.set(c, []);
+      groups.get(c).push(MOVE_ARROWS[move] || move);
+    }
+    const text = [...groups.entries()].sort((a, b) => a[0] - b[0]).map(([c, arrows]) => `${arrows.join(" ")} = ${c}`);
+    els.costLegend.textContent = `Chi phí: ${text.join(" · ")}`;
   }
 
   // Khối "Nút đang xử lý": cur_node → child + các nước đi + bảng kiểm tra.
@@ -1482,13 +1644,14 @@
     if (isRootPhase) curNode = nodes[0];
     const candNode = step.candidate_id !== null ? nodes[step.candidate_id] : null;
     const childShown = Boolean(candNode) && CHILD_EVENTS.has(ev);
-    const isDup = ev === "skip_explored" || ev === "skip_frontier";
+    const isDup = ev === "skip_explored" || ev === "skip_frontier" || ev === "not_better";
+    const ucs = isUcs(trace.algorithm);
     const isGoalChild = ev === "goal_early";
     const isGoalCur = ev === "goal_late" || ev === "goal_init";
 
     // cur_node
     els.curLabel.textContent = isRootPhase ? "root" : "cur_node";
-    els.curNodeBadge.textContent = curNode ? `#${curNode.id} · d=${curNode.depth}` : "—";
+    els.curNodeBadge.textContent = curNode ? nodeBadge(curNode, ucs) : "—";
     renderState(els.curBoardContainer, curNode ? curNode.state : null, {
       emptyText: "—",
       targetBoard: trace.target_board,
@@ -1499,7 +1662,7 @@
 
     // child
     if (childShown) {
-      els.candNodeBadge.textContent = `#${candNode.id} · d=${candNode.depth}`;
+      els.candNodeBadge.textContent = nodeBadge(candNode, ucs);
       els.candNodeBadge.className = `mono-pill ${isDup ? "pill-rose" : isGoalChild ? "pill-emerald" : "pill-indigo"}`;
       els.moveArrowBadge.textContent = MOVE_ARROWS[candNode.action] || "→";
       els.moveArrowBadge.className = `move-arrow-badge ${isDup ? "collision" : isGoalChild ? "goal" : "active"}`;
@@ -1531,7 +1694,7 @@
 
     // Các nước đi hợp lệ của ô trống (vòng lặp for move in actions)
     els.movesRow.innerHTML = "";
-    const moves = curNode && !isRootPhase ? curNode.actions || [] : [];
+    const moves = curNode && !isRootPhase && ev !== "skip_stale" ? curNode.actions || [] : [];
     if (!moves.length) {
       const none = document.createElement("span");
       none.className = "meta-muted";
@@ -1543,11 +1706,18 @@
         const chip = document.createElement("span");
         chip.className = "move-chip" + (i === activeIdx ? " active" : i < activeIdx ? " done" : "");
         chip.textContent = `${MOVE_ARROWS[m] || ""} ${m}`;
+        if (ucs && trace.move_costs && trace.move_costs[m] !== undefined) {
+          const price = document.createElement("span");
+          price.className = "chip-cost";
+          price.textContent = `·${trace.move_costs[m]}`;
+          chip.appendChild(price);
+        }
         els.movesRow.appendChild(chip);
       });
     }
 
-    renderChecklist(step, trace.config);
+    renderChecklist(step, trace.config, trace.algorithm);
+    renderCostLegend(trace);
   }
 
   function renderStep() {
@@ -1562,7 +1732,7 @@
       renderState(els.candBoardContainer, null, { emptyText: "chưa sinh nút con" });
       renderGoal(
         vac
-          ? { problem: "vacuum", goal_description: "Cả hai phòng đều sạch" }
+          ? { problem: "vacuum", goal_description: vacGoalText(state.vacStart.dirt.length) }
           : { problem: "npuzzle", target_board: state.targetBoard }
       );
       els.curLabel.textContent = "root";
@@ -1583,9 +1753,11 @@
       els.eventMessage.textContent = "Chưa có bước nào để hiển thị.";
       els.firstBtn.disabled = els.prevBtn.disabled = els.nextBtn.disabled = els.lastBtn.disabled = true;
       applyFocus(null);
-      els.vizRow.classList.toggle("has-graph", state.problem === "vacuum");
-      els.graphCard.classList.toggle("hidden", state.problem !== "vacuum");
+      const emptyGraph = state.problem === "vacuum" && state.vacStart.dirt.length === 2;
+      els.vizRow.classList.toggle("has-graph", emptyGraph);
+      els.graphCard.classList.toggle("hidden", !emptyGraph);
       els.vacGraphSvg.innerHTML = "";
+      renderCostLegend(null);
       renderSearchTree();
       return;
     }
@@ -1628,31 +1800,36 @@
     renderWork(step, trace);
 
     // Mã giả + giá trị biến
-    els.modeSummaryTag.textContent = `${trace.config.graph_search ? "Graph" : "Tree"} · ${trace.config.early_goal_test ? "Early Goal" : "Late Goal"}`;
+    els.modeSummaryTag.textContent = isUcs(algorithm)
+      ? "Graph · Late Goal · ưu tiên theo g"
+      : `${trace.config.graph_search ? "Graph" : "Tree"} · ${trace.config.early_goal_test ? "Early Goal" : "Late Goal"}`;
+    els.legendStale.classList.toggle("hidden", !isUcs(algorithm));
+    els.legendCost.classList.toggle("hidden", !isUcs(algorithm));
     renderCodePanel(trace.source_lines, step.line, step.event_type, step.vars);
 
     // Hàng đợi và explored
     els.frontierCountBadge.textContent = String(step.frontier_ids.length);
     els.exploredCountBadge.textContent = String(step.explored_ids.length);
     renderFrontierStrip(step, nodes, algorithm);
-    renderExploredStrip(step, nodes, trace.config);
+    renderExploredStrip(step, nodes, trace.config, algorithm);
 
     // Thống kê
     const m = step.metrics;
     els.kpiExpanded.textContent = String(m.expanded);
     els.kpiGenerated.textContent = String(m.generated);
-    els.kpiSkipped.textContent = String(m.skipped_explored + m.skipped_frontier);
+    els.kpiSkipped.textContent = String(m.skipped_explored + m.skipped_frontier + (m.skipped_stale || 0));
     els.kpiMaxFrontier.textContent = String(m.max_frontier_size);
     const solLen = trace.summary.solution_length !== null ? `${trace.summary.solution_length} bước` : "chưa có";
     els.kpiSolutionBranch.textContent = `${solLen} · b≈${trace.summary.avg_branching_factor}`;
+    els.kpiCost.textContent = trace.summary.solution_cost !== null && trace.summary.solution_cost !== undefined ? String(trace.summary.solution_cost) : "chưa có";
     els.solvFormula.textContent = solv.formula;
     els.solvExplanation.textContent = solv.explanation;
 
-    const isVac = trace.problem === "vacuum";
-    els.vizRow.classList.toggle("has-graph", isVac);
-    els.graphCard.classList.toggle("hidden", !isVac);
+    const showGraph = trace.problem === "vacuum" && trace.rooms === 2;
+    els.vizRow.classList.toggle("has-graph", showGraph);
+    els.graphCard.classList.toggle("hidden", !showGraph);
     renderSearchTree();
-    if (isVac) drawVacuumGraph(els.vacGraphSvg, trace, state.currentStep);
+    if (showGraph) drawVacuumGraph(els.vacGraphSvg, trace, state.currentStep);
     if (els.analysisCard.open) renderMemoryChart();
     renderPinnedNode();
     renderPredictPrompt();
@@ -1703,7 +1880,7 @@
         showAlert(
           "warn",
           `${algoName} đã dừng ở giới hạn an toàn ${payload.max_nodes} nút mở rộng.`,
-          !payload.graph_search
+          !data.config.graph_search
             ? "Bạn đang tắt Graph Search (Tree Search không lọc trùng), nên thuật toán cứ lặp lại các trạng thái cũ và cây phình to mãi. Hãy bước tới để quan sát vòng lặp!"
             : "Tăng giới hạn nút mở rộng (trong Tùy chọn) nếu muốn tìm tiếp tới đích."
         );
@@ -1713,7 +1890,7 @@
           `Frontier đã cạn — ${algoName} xác nhận bài toán KHÔNG CÓ LỜI GIẢI!`,
           data.solvability.explanation
         );
-      } else if (data.status === "solved" && !payload.graph_search) {
+      } else if (data.status === "solved" && !data.config.graph_search) {
         showAlert(
           "warn",
           `Tìm thấy lời giải (${data.summary.solution_length} bước) ở chế độ Tree Search (không lọc trùng).`,
@@ -1733,11 +1910,11 @@
   }
 
   // ── Chế độ so sánh hai thuật toán ───────────────────────────────────────────
-  // Chạy BFS và DFS trên CÙNG bài toán/cấu hình, rồi đặt cạnh nhau. Một "tick" = một lần
+  // Chạy hai thuật toán (chọn ở hai ô thả xuống) trên CÙNG bài toán/cấu hình, rồi đặt cạnh nhau. Một "tick" = một lần
   // mở rộng nút (một lần pop), nên hai bên luôn cùng mở rộng nút thứ k tại mỗi thời điểm.
 
-  const COMPARE_ALGOS = ["bfs", "dfs"];
-  const ALGO_COLORS = { bfs: "#4f46e5", dfs: "#0d9488" };
+  const ALGO_ORDER = ["bfs", "dfs", "ucs", "ucs_fast"];
+  const ALGO_COLORS = { bfs: "#4f46e5", dfs: "#0d9488", ucs: "#ea580c", ucs_fast: "#9333ea" };
   const CMP_HEAD = 3;
   const CMP_TAIL = 4;
 
@@ -1786,14 +1963,16 @@
   function renderCompareSummary() {
     const runs = state.compare.runs;
     const bothSolved = runs.length === 2 && runs.every((r) => r.trace.status === "solved");
-    const total = (r) => r.trace.summary.skipped_explored + r.trace.summary.skipped_frontier;
+    const sm = (r) => r.trace.summary;
+    const total = (r) => sm(r).skipped_explored + sm(r).skipped_frontier + (sm(r).skipped_stale || 0);
     const rows = [
       { label: "Kết quả", get: (r) => resultLabel(r.trace.status).text, plain: true },
-      { label: "Độ dài lời giải (bước)", get: (r) => r.trace.summary.solution_length, compare: true },
-      { label: "Nút đã mở rộng", get: (r) => r.trace.summary.nodes_expanded, compare: true },
-      { label: "Nút đã sinh", get: (r) => r.trace.summary.nodes_generated, compare: true },
-      { label: "Frontier lớn nhất", get: (r) => r.trace.summary.max_frontier_size, compare: true },
-      { label: "Nút bị bỏ qua (trùng)", get: total, compare: false },
+      { label: "Độ dài lời giải (bước)", get: (r) => sm(r).solution_length, compare: true },
+      { label: "Chi phí lời giải (g)", get: (r) => sm(r).solution_cost, compare: true },
+      { label: "Nút đã mở rộng", get: (r) => sm(r).nodes_expanded, compare: true },
+      { label: "Nút đã sinh", get: (r) => sm(r).nodes_generated, compare: true },
+      { label: "Frontier lớn nhất", get: (r) => sm(r).max_frontier_size, compare: true },
+      { label: "Nút bị bỏ qua", get: total, compare: false },
     ];
 
     let html = "<thead><tr><th></th>";
@@ -1818,9 +1997,9 @@
     const lines = [];
     const name = (r) => ALGO_LABELS[r.algorithm].name;
     const sm = (r) => r.trace.summary;
-    const cfg = a.trace.config;
 
     for (const r of [a, b]) {
+      const cfg = r.trace.config;
       if (r.trace.status === "limit_reached") {
         lines.push(
           cfg.graph_search
@@ -1835,11 +2014,24 @@
     if (a.trace.status === "solved" && b.trace.status === "solved") {
       const la = sm(a).solution_length;
       const lb = sm(b).solution_length;
+      const ca = sm(a).solution_cost;
+      const cb = sm(b).solution_cost;
       lines.push(
         la === lb
           ? `Cả hai cùng cho lời giải ${la} bước.`
-          : `${la < lb ? name(a) : name(b)} cho lời giải ngắn hơn (${Math.min(la, lb)} so với ${Math.max(la, lb)} bước). BFS luôn tìm được lời giải ngắn nhất khi mọi nước đi tốn như nhau.`
+          : `${la < lb ? name(a) : name(b)} cho lời giải ít bước hơn (${Math.min(la, lb)} so với ${Math.max(la, lb)} bước).`
       );
+      if (ca === cb) {
+        lines.push(`Cả hai cùng chi phí ${ca}.${[a, b].some((r) => isUcs(r.algorithm)) ? " UCS luôn tìm được lời giải có chi phí thấp nhất." : ""}`);
+      } else {
+        const cheaper = ca < cb ? a : b;
+        const fewer = la < lb ? a : lb < la ? b : null;
+        lines.push(
+          fewer && fewer !== cheaper
+            ? `${name(fewer)} ít bước hơn nhưng ĐẮT hơn: chi phí ${sm(fewer).solution_cost} so với ${sm(cheaper).solution_cost}. Ít bước chưa chắc rẻ hơn khi mỗi hành động có giá khác nhau.`
+            : `${name(cheaper)} cho lời giải rẻ hơn: chi phí ${Math.min(ca, cb)} so với ${Math.max(ca, cb)}.`
+        );
+      }
       const ea = sm(a).nodes_expanded;
       const eb = sm(b).nodes_expanded;
       lines.push(
@@ -1849,7 +2041,19 @@
       );
     } else if (a.trace.status === "solved" || b.trace.status === "solved") {
       const winner = a.trace.status === "solved" ? a : b;
-      lines.push(`Chỉ ${name(winner)} tìm được lời giải (${sm(winner).solution_length} bước).`);
+      lines.push(`Chỉ ${name(winner)} tìm được lời giải (${sm(winner).solution_length} bước, chi phí ${sm(winner).solution_cost}).`);
+    }
+
+    // Hai bản UCS: khác nhau ở cách làm REPLACE, nhưng chỉ lộ ra khi thật sự có đường rẻ hơn tới nút đang chờ.
+    const kinds = [a.algorithm, b.algorithm];
+    if (kinds.includes("ucs") && kinds.includes("ucs_fast")) {
+      const slide = a.algorithm === "ucs" ? a : b;
+      const fast = slide === a ? b : a;
+      lines.push(
+        sm(slide).replaced === 0
+          ? "Lần chạy này không có nút nào tìm được đường rẻ hơn tới một trạng thái đang chờ trong frontier, nên hai bản UCS chạy giống hệt nhau (bản tối ưu chỉ thêm vài dòng kiểm tra)."
+          : `Bản slide thay ${sm(slide).replaced} nút trong frontier; bản tối ưu thêm nút mới, để ${sm(fast).replaced} nút cũ trong frontier và bỏ qua ${sm(fast).skipped_stale || 0} nút cũ khi pop.`
+      );
     }
 
     const fa = sm(a).max_frontier_size;
@@ -1868,10 +2072,11 @@
     }
   }
 
-  function buildCompareSides(problem) {
-    const isVac = problem === "vacuum";
+  function buildCompareSides(problem, rooms) {
+    // Đồ thị trạng thái chỉ vẽ được cho Vacuum 2 phòng (8 trạng thái); nhiều phòng hơn thì hiện thế giới robot.
+    const isVac = problem === "vacuum" && rooms === 2;
     els.cmpSides.innerHTML = "";
-    state.compare.sides = COMPARE_ALGOS.map((algo) => {
+    state.compare.sides = state.compare.algos.map((algo) => {
       const labels = ALGO_LABELS[algo];
       const root = document.createElement("section");
       root.className = "cmp-side";
@@ -1957,9 +2162,14 @@
     renderCardStrip(side.frontier, ids, nodes, {
       head: CMP_HEAD,
       tail: CMP_TAIL,
+      cost: isUcs(run.algorithm),
       emptyText: `${labels.container} rỗng.`,
       optsFor: (id, idx) => {
         if (fresh.has(id)) return { cls: "card-new", tag: { text: "MỚI", cls: "pill-emerald" }, highlight: true };
+        const nd = nodes[id];
+        if (nd.superseded_step !== null && nd.superseded_step !== undefined && nd.superseded_step <= stepIdx) {
+          return { cls: "card-stale", tag: { text: "CŨ", cls: "pill-neutral" } };
+        }
         if (idx === nextIdx) return { cls: "card-front", tag: { text: labels.next, cls: "pill-amber" } };
         return {};
       },
@@ -1976,17 +2186,21 @@
         boardCls: goalNode ? "board-goal" : null,
       });
     }
+    const where = isUcs(run.algorithm) ? `g = ${shown.path_cost}` : `tầng ${shown.depth}`;
+    const wasDiscarded = shown.discarded_step !== null && shown.discarded_step !== undefined && shown.discarded_step <= stepIdx;
     side.workLabel.textContent = goalNode
-      ? `🎯 Nút đích #${shown.id} · tầng ${shown.depth}`
+      ? `🎯 Nút đích #${shown.id} · ${where}`
       : k === 0
-        ? `Nút gốc #${shown.id} · tầng ${shown.depth}`
-        : `Nút vừa mở rộng #${shown.id} · tầng ${shown.depth}`;
+        ? `Nút gốc #${shown.id} · ${where}`
+        : wasDiscarded
+          ? `Nút CŨ #${shown.id} bị bỏ qua · ${where}`
+          : `Nút vừa mở rộng #${shown.id} · ${where}`;
 
     // đường đi lời giải
     if (done && solved) {
       const path = trace.solution_ids.slice(1).map((id) => MOVE_ARROWS[nodes[id].action] || nodes[id].action);
       side.solution.textContent = path.length
-        ? `Lời giải (${path.length} bước): ${path.join(" ")}`
+        ? `Lời giải (${path.length} bước, chi phí ${trace.summary.solution_cost}): ${path.join(" ")}`
         : "Nút gốc đã là đích (0 bước).";
       side.solution.classList.remove("hidden");
     } else {
@@ -2104,11 +2318,11 @@
     try {
       const base = buildPayload(forceRun);
       const results = await Promise.all(
-        COMPARE_ALGOS.map((algorithm) =>
+        state.compare.algos.map((algorithm) =>
           apiJson("/api/solve", { method: "POST", body: JSON.stringify({ ...base, algorithm }) })
         )
       );
-      buildCompareSides(results[0].problem);
+      buildCompareSides(results[0].problem, results[0].rooms);
 
       if (results[0].status === "unsolvable_blocked") {
         state.compare.runs = [];
@@ -2130,7 +2344,7 @@
         return;
       }
 
-      state.compare.runs = results.map((trace, i) => deriveRun(COMPARE_ALGOS[i], trace));
+      state.compare.runs = results.map((trace, i) => deriveRun(state.compare.algos[i], trace));
       state.compare.maxTick = Math.max(...state.compare.runs.map((r) => r.n));
       // Trace tổng hợp: mỗi "bước" là một lần mở rộng, để các nút điều khiển phát dùng lại nguyên vẹn.
       state.trace = {
@@ -2141,6 +2355,7 @@
       state.currentStep = 0;
       renderCompareSummary();
       renderCompareInsight();
+      renderCompareLegends();
       renderStep();
     } catch (err) {
       showAlert("", "Không thể so sánh", err.message);
@@ -2150,13 +2365,61 @@
     }
   }
 
+  function populateComparePickers() {
+    for (const sel of [els.cmpAlgoA, els.cmpAlgoB]) {
+      sel.innerHTML = "";
+      for (const key of ALGO_ORDER) {
+        const opt = document.createElement("option");
+        opt.value = key;
+        opt.textContent = ALGO_LABELS[key].name;
+        sel.appendChild(opt);
+      }
+    }
+    syncComparePickers();
+  }
+
+  function syncComparePickers() {
+    els.cmpAlgoA.value = state.compare.algos[0];
+    els.cmpAlgoB.value = state.compare.algos[1];
+  }
+
+  // side = 0 (ô bên trái) hoặc 1 (ô bên phải) vừa được đổi. Hai bên không được trùng nhau.
+  function onComparePicked(side) {
+    const picked = [els.cmpAlgoA.value, els.cmpAlgoB.value];
+    if (picked[0] === picked[1]) {
+      picked[1 - side] = ALGO_ORDER.find((key) => key !== picked[side]);
+    }
+    state.compare.algos = picked;
+    syncComparePickers();
+    if (state.compare.enabled) runCompare(false);
+  }
+
+  function renderCompareLegends() {
+    for (const box of [els.cmpLegendDepth, els.cmpLegendFrontier]) {
+      box.innerHTML = "";
+      for (const algo of state.compare.algos) {
+        const item = document.createElement("span");
+        item.className = "cmp-legend-item";
+        const dot = document.createElement("i");
+        dot.style.background = ALGO_COLORS[algo];
+        item.append(dot, document.createTextNode(ALGO_LABELS[algo].name));
+        box.appendChild(item);
+      }
+    }
+  }
+
   function setCompareMode(on) {
     stopPlayback();
     hideAlert();
     state.compare.enabled = on;
     document.querySelector(".app-shell").classList.toggle("compare-on", on);
     document.body.classList.toggle("compare-on", on); // thanh phát nằm ngoài .app-shell
-    if (on) setPredictMode(false);
+    if (on) {
+      // Mặc định so BFS với DFS; đang xem UCS thì so UCS với BFS (để thấy khác biệt về chi phí).
+      state.compare.algos = isUcs(state.algorithm) ? ["bfs", state.algorithm] : ["bfs", "dfs"];
+      syncComparePickers();
+      setPredictMode(false);
+    }
     els.compareBtn.setAttribute("aria-pressed", String(on));
     els.compareBtn.classList.toggle("btn-primary", on);
     els.compareBtn.classList.toggle("btn-secondary", !on);
@@ -2184,12 +2447,12 @@
     if (nxt.event_type === "dequeue" && cur.frontier_ids.length > 1) {
       return { type: "pop", stepIdx: idx, answerId: nxt.cur_id, answered: false };
     }
-    if (cur.event_type === "gen_child" && ["skip_explored", "skip_frontier", "check_pass"].includes(nxt.event_type)) {
+    if (cur.event_type === "gen_child" && ["skip_explored", "skip_frontier", "check_pass", "dup_frontier"].includes(nxt.event_type)) {
       return {
         type: "dup",
         stepIdx: idx,
         childId: cur.candidate_id,
-        answer: nxt.event_type === "check_pass" ? "new" : "dup",
+        answer: nxt.event_type === "check_pass" ? "new" : nxt.event_type === "dup_frontier" ? "frontier" : "dup",
         where: nxt.event_type === "skip_explored" ? "explored" : "frontier",
         collisionId: nxt.collision_id,
         answered: false,
@@ -2221,12 +2484,14 @@
   }
 
   function predictExplanation(q) {
-    const trace = state.trace;
-    const bfs = trace.algorithm !== "dfs";
+    const algo = state.trace.algorithm;
     if (q.type === "pop") {
-      const rule = bfs
-        ? "BFS lấy nút ở ĐẦU hàng đợi (vào sớm nhất → ra trước, FIFO)."
-        : "DFS lấy nút ở ĐỈNH ngăn xếp (vào gần đây nhất → ra trước, LIFO).";
+      const rule =
+        algo === "dfs"
+          ? "DFS lấy nút ở ĐỈNH ngăn xếp (vào gần đây nhất → ra trước, LIFO)."
+          : isUcs(algo)
+          ? "UCS lấy nút có chi phí g NHỎ NHẤT trong frontier (hòa thì nút vào hàng trước)."
+          : "BFS lấy nút ở ĐẦU hàng đợi (vào sớm nhất → ra trước, FIFO).";
       return q.skipped
         ? `Đáp án: #${q.answerId}. ${rule}`
         : q.correct
@@ -2236,6 +2501,10 @@
     const detail =
       q.answer === "dup"
         ? `#${q.childId} trùng với #${q.collisionId} ${q.where === "explored" ? "đã được mở rộng xong (nằm trong explored)" : "đang chờ sẵn trong frontier"} → bị bỏ qua.`
+        : q.answer === "frontier"
+        ? `#${q.childId} chưa explored nhưng cùng trạng thái với #${q.collisionId} đang chờ trong frontier → xét tiếp xem đường nào rẻ hơn.`
+        : algo === "ucs_fast"
+        ? `#${q.childId} chưa có trong explored → chưa bị bỏ qua, sẽ xét tiếp với best_cost.`
         : `#${q.childId} chưa có trong explored lẫn frontier → là trạng thái MỚI, sẽ được thêm vào.`;
     return q.skipped ? `Đáp án: ${detail}` : q.correct ? `Đúng! ${detail}` : `Chưa đúng. ${detail}`;
   }
@@ -2283,9 +2552,21 @@
       if (q.type === "pop") {
         els.eventMessage.textContent = "Nút nào sẽ được POP tiếp theo? Bấm vào một thẻ trong frontier.";
       } else {
-        els.eventMessage.textContent = `Nút con #${q.childId} sẽ bị bỏ qua (trùng) hay là trạng thái mới?`;
-        addBtn("✗ Trùng → bỏ qua", "btn-secondary", () => answerPredict("dup"));
-        addBtn("✓ Mới → thêm vào", "btn-secondary", () => answerPredict("new"));
+        const algo = state.trace.algorithm;
+        if (algo === "ucs") {
+          els.eventMessage.textContent = `Nút con #${q.childId}: đã explored, đang chờ trong frontier, hay là trạng thái mới?`;
+          addBtn("✗ Đã explored → bỏ qua", "btn-secondary", () => answerPredict("dup"));
+          addBtn("🔁 Đã có trong frontier → so g", "btn-secondary", () => answerPredict("frontier"));
+          addBtn("✓ Mới → thêm vào", "btn-secondary", () => answerPredict("new"));
+        } else if (algo === "ucs_fast") {
+          els.eventMessage.textContent = `Nút con #${q.childId} đã nằm trong explored hay chưa?`;
+          addBtn("✗ Đã explored → bỏ qua", "btn-secondary", () => answerPredict("dup"));
+          addBtn("✓ Chưa explored → xét tiếp", "btn-secondary", () => answerPredict("new"));
+        } else {
+          els.eventMessage.textContent = `Nút con #${q.childId} sẽ bị bỏ qua (trùng) hay là trạng thái mới?`;
+          addBtn("✗ Trùng → bỏ qua", "btn-secondary", () => answerPredict("dup"));
+          addBtn("✓ Mới → thêm vào", "btn-secondary", () => answerPredict("new"));
+        }
       }
       addBtn("Bỏ qua", "btn-secondary", () => answerPredict(null, { skip: true }));
     } else {
@@ -2322,15 +2603,22 @@
 
   // ── Chọn bài toán / thuật toán / đề mẫu ─────────────────────────────────────
 
+  const vacRooms = () => state.vacStart.dirt.length;
+
+  function presetsFor(problem) {
+    return state.presets.filter((q) => q.problem === problem && (problem !== "vacuum" || q.rooms === vacRooms()));
+  }
+
   function defaultPresetFor(problem) {
-    const list = state.presets.filter((q) => q.problem === problem);
-    const preferred = problem === "vacuum" ? "v_both_a" : "p8_branch";
+    const list = presetsFor(problem);
+    const n = vacRooms();
+    const preferred = problem === "vacuum" ? (n === 2 ? "v_both_a" : `v${n}_all_left`) : "p8_branch";
     return list.find((q) => q.id === preferred) || list[0] || null;
   }
 
   function populatePresets() {
     els.presetSelect.innerHTML = "";
-    for (const pr of state.presets.filter((q) => q.problem === state.problem)) {
+    for (const pr of presetsFor(state.problem)) {
       const opt = document.createElement("option");
       opt.value = pr.id;
       opt.textContent = pr.name;
@@ -2342,12 +2630,43 @@
     els.presetSelect.appendChild(customOpt);
   }
 
+  // Dựng lại ba nhóm điều khiển của Vacuum theo số phòng hiện tại (rẻ nên dựng lại mỗi lần đổi).
   function syncVacuumControls() {
-    els.vacRobotSelector.querySelectorAll(".seg-btn").forEach((b) => {
-      b.classList.toggle("active", Number(b.dataset.room) === state.vacStart.robot);
+    const n = vacRooms();
+
+    els.vacRoomsSelector.innerHTML = "";
+    for (const count of state.vacuumRooms) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "seg-btn" + (count === n ? " active" : "");
+      btn.dataset.rooms = String(count);
+      btn.textContent = `${count} phòng`;
+      els.vacRoomsSelector.appendChild(btn);
+    }
+
+    els.vacRobotSelector.innerHTML = "";
+    for (let i = 0; i < n; i++) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "seg-btn" + (state.vacStart.robot === i ? " active" : "");
+      btn.dataset.room = String(i);
+      btn.textContent = `Robot ở ${ROOM_NAMES[i]}`;
+      els.vacRobotSelector.appendChild(btn);
+    }
+
+    els.vacDirtToggles.innerHTML = "";
+    state.vacStart.dirt.forEach((dirty, i) => {
+      const label = document.createElement("label");
+      label.className = "toggle-chip";
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.dataset.room = String(i);
+      box.checked = dirty;
+      const text = document.createElement("span");
+      text.textContent = `Phòng ${ROOM_NAMES[i]} bẩn`;
+      label.append(box, text);
+      els.vacDirtToggles.appendChild(label);
     });
-    els.vacDirtA.checked = state.vacStart.dirt[0];
-    els.vacDirtB.checked = state.vacStart.dirt[1];
   }
 
   function applyPreset(preset) {
@@ -2373,6 +2692,13 @@
     els.algoSelector.querySelectorAll(".seg-btn").forEach((b) => {
       b.classList.toggle("active", b.dataset.algo === state.algorithm);
     });
+    // UCS luôn là Graph Search + Late Goal (đúng slide): khóa hai tùy chọn và giải thích vì sao.
+    const ucs = isUcs(state.algorithm);
+    for (const toggle of [els.graphSearchToggle, els.earlyGoalToggle]) {
+      toggle.disabled = ucs;
+      toggle.closest(".option-toggle").classList.toggle("is-locked", ucs);
+    }
+    els.ucsOptionNote.classList.toggle("hidden", !ucs);
   }
 
   async function setProblem(problem, { run = true } = {}) {
@@ -2389,6 +2715,22 @@
       applyPreset(def);
     }
     if (run) await runSearch(false);
+  }
+
+  // Đổi số phòng: quay về đề "tất cả bẩn, robot ở phòng đầu" của số phòng mới.
+  async function setVacRooms(count) {
+    if (count === vacRooms()) return;
+    stopPlayback();
+    state.vacStart = { robot: 0, dirt: Array(count).fill(true) };
+    populatePresets();
+    const def = defaultPresetFor("vacuum");
+    if (def) {
+      els.presetSelect.value = def.id;
+      applyPreset(def);
+    } else {
+      syncVacuumControls();
+    }
+    await runSearch(false);
   }
 
   function onVacuumStartEdited() {
@@ -2606,20 +2948,25 @@
       runSearch(false);
     });
 
+    els.vacRoomsSelector.addEventListener("click", (e) => {
+      const btn = e.target.closest(".seg-btn");
+      if (!btn) return;
+      setVacRooms(Number(btn.dataset.rooms));
+    });
     els.vacRobotSelector.addEventListener("click", (e) => {
       const btn = e.target.closest(".seg-btn");
       if (!btn) return;
       state.vacStart.robot = Number(btn.dataset.room);
       onVacuumStartEdited();
     });
-    els.vacDirtA.addEventListener("change", () => {
-      state.vacStart.dirt[0] = els.vacDirtA.checked;
+    els.vacDirtToggles.addEventListener("change", (e) => {
+      const box = e.target.closest("input[type=checkbox]");
+      if (!box) return;
+      state.vacStart.dirt[Number(box.dataset.room)] = box.checked;
       onVacuumStartEdited();
     });
-    els.vacDirtB.addEventListener("change", () => {
-      state.vacStart.dirt[1] = els.vacDirtB.checked;
-      onVacuumStartEdited();
-    });
+    els.cmpAlgoA.addEventListener("change", () => onComparePicked(0));
+    els.cmpAlgoB.addEventListener("change", () => onComparePicked(1));
 
     els.presetSelect.addEventListener("change", () => {
       const preset = state.presets.find((q) => q.id === els.presetSelect.value);
@@ -2852,6 +3199,9 @@
     try {
       const data = await apiJson("/api/presets");
       state.presets = data.presets || [];
+      state.vacuumRooms = data.vacuum_rooms || state.vacuumRooms;
+      populateComparePickers();
+      syncVacuumControls();
       updateAlgoLabels();
       await setProblem("npuzzle");
       hideAlert();

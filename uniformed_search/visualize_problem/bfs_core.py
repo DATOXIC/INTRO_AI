@@ -14,6 +14,9 @@ from search_core import (  # noqa: F401  (re-exported for backwards compatibilit
     ALGORITHMS,
     BFS,
     DFS,
+    UCS,
+    UCS_ALGORITHMS,
+    UCS_fast,
     Domain,
     Node,
     Problem,
@@ -340,6 +343,14 @@ def get_bfs_source_lines(graph_search: bool = True, early_goal_test: bool = True
     return get_source_lines("bfs", graph_search, early_goal_test)
 
 
+NPUZZLE_MOVE_COSTS: dict[str, int] = {"Lên": 1, "Xuống": 1, "Trái": 2, "Phải": 2}
+
+
+def cost_npuzzle(board: Board, move: Move) -> int:
+    """Chi phí một nước đi: Lên/Xuống tốn 1, Trái/Phải tốn 2."""
+    return NPUZZLE_MOVE_COSTS[move]
+
+
 def make_npuzzle_domain(start_board: Board, target_board: Board) -> Domain:
     """Build the trace domain for one n-puzzle instance."""
     if len(start_board) != len(target_board):
@@ -377,6 +388,8 @@ def make_npuzzle_domain(start_board: Board, target_board: Board) -> Domain:
             "start_board": [list(r) for r in start_board],
             "target_board": [list(r) for r in target_board],
         },
+        step_cost=cost_npuzzle,
+        move_costs=dict(NPUZZLE_MOVE_COSTS),
     )
 
 

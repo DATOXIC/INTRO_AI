@@ -23,7 +23,7 @@ from bfs_core import (
     shuffle_solvable,
     validate_board,
 )
-from vacuum_world import make_vacuum_domain, validate_vacuum_state
+from vacuum_world import MAX_ROOMS, MIN_ROOMS, make_vacuum_domain, validate_vacuum_state
 
 PROBLEMS = ("npuzzle", "vacuum")
 
@@ -51,6 +51,7 @@ def _presets() -> dict[str, Any]:
         "allowed_sizes": list(ALLOWED_SIZES),
         "problems": list(PROBLEMS),
         "algorithms": list(ALGORITHMS),
+        "vacuum_rooms": list(range(MIN_ROOMS, MAX_ROOMS + 1)),
         "presets": get_presets(),
         "default_source_lines": get_source_lines("bfs", True, True),
     }

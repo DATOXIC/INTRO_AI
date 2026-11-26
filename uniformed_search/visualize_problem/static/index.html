@@ -20,8 +20,10 @@
         <div class="segmented" id="algoSelector" role="group" aria-label="Thuật toán">
           <button type="button" class="seg-btn active" data-algo="bfs">BFS</button>
           <button type="button" class="seg-btn" data-algo="dfs">DFS</button>
+          <button type="button" class="seg-btn" data-algo="ucs" title="UCS đúng mã giả trên slide (có REPLACE nút trong frontier)">UCS</button>
+          <button type="button" class="seg-btn" data-algo="ucs_fast" title="UCS tối ưu: best_cost, nút cũ bị bỏ qua khi pop">UCS tối ưu</button>
         </div>
-        <button type="button" id="compareBtn" class="btn btn-secondary" aria-pressed="false" title="Chạy BFS và DFS trên cùng bài toán rồi đặt cạnh nhau">⇄ So sánh</button>
+        <button type="button" id="compareBtn" class="btn btn-secondary" aria-pressed="false" title="Chạy hai thuật toán trên cùng bài toán rồi đặt cạnh nhau">⇄ So sánh</button>
         <select id="presetSelect" class="select-input" aria-label="Chọn đề bài mẫu"></select>
         <button type="button" id="optionsBtn" class="btn btn-secondary" aria-expanded="false" aria-controls="optionsPanel" title="Tùy chọn">⚙ Tùy chọn</button>
       </div>
@@ -30,14 +32,15 @@
     <!-- Tùy chọn: ẩn mặc định -->
     <section id="optionsPanel" class="options-panel hidden" aria-label="Tùy chọn">
       <div class="option-block vac-only hidden">
+        <span class="control-label">Số phòng</span>
+        <div class="segmented" id="vacRoomsSelector" role="group" aria-label="Số phòng"></div>
+      </div>
+
+      <div class="option-block vac-only hidden">
         <span class="control-label">Trạng thái xuất phát</span>
         <div class="inline-pair">
-          <div class="segmented" id="vacRobotSelector" role="group" aria-label="Vị trí robot">
-            <button type="button" class="seg-btn active" data-room="0">Robot ở A</button>
-            <button type="button" class="seg-btn" data-room="1">Robot ở B</button>
-          </div>
-          <label class="toggle-chip"><input type="checkbox" id="vacDirtA" checked /><span>Phòng A bẩn</span></label>
-          <label class="toggle-chip"><input type="checkbox" id="vacDirtB" checked /><span>Phòng B bẩn</span></label>
+          <div class="segmented" id="vacRobotSelector" role="group" aria-label="Vị trí robot"></div>
+          <span id="vacDirtToggles" class="inline-pair"></span>
         </div>
       </div>
 
@@ -59,6 +62,8 @@
           <button type="button" id="editBoardBtn" class="btn btn-secondary btn-sm">Tự đặt bảng…</button>
         </div>
       </div>
+
+      <p id="ucsOptionNote" class="option-note-block hidden">UCS luôn là <b>Graph Search</b> và kiểm tra đích <b>khi lấy nút ra</b> (Late Goal), đúng như mã giả trên slide, nên hai tùy chọn dưới đây không áp dụng.</p>
 
       <label class="option-toggle">
         <input type="checkbox" id="graphSearchToggle" checked />
@@ -169,6 +174,7 @@
             <div class="moves-row">
               <code class="moves-label">for move in actions(cur_node)</code>
               <div id="movesRow" class="moves-chips"></div>
+              <span id="costLegend" class="cost-legend hidden"></span>
             </div>
           </div>
 
@@ -203,8 +209,18 @@
     </main>
 
 
-    <!-- Chế độ so sánh: BFS và DFS trên cùng bài toán, bước đồng bộ theo số lần mở rộng nút -->
+    <!-- Chế độ so sánh: hai thuật toán tùy chọn trên cùng bài toán, bước đồng bộ theo số lần mở rộng nút -->
     <section id="compareView" class="compare-view" aria-label="So sánh hai thuật toán">
+      <div class="cmp-pickers">
+        <label class="cmp-picker"><span>Bên trái</span>
+          <select id="cmpAlgoA" class="select-input" aria-label="Thuật toán bên trái"></select>
+        </label>
+        <span class="cmp-vs">so với</span>
+        <label class="cmp-picker"><span>Bên phải</span>
+          <select id="cmpAlgoB" class="select-input" aria-label="Thuật toán bên phải"></select>
+        </label>
+      </div>
+
       <div class="cmp-top">
         <div class="cmp-card">
           <h3>Kết quả cuối cùng</h3>
@@ -220,14 +236,14 @@
         <div class="cmp-card">
           <div class="section-bar">
             <h3>Độ sâu của nút được mở rộng</h3>
-            <div class="tree-legend"><span><i class="dot lg-bfs"></i>BFS</span><span><i class="dot lg-dfs"></i>DFS</span></div>
+            <div class="tree-legend" id="cmpLegendDepth"></div>
           </div>
           <svg id="cmpDepthChart" class="cmp-chart" viewBox="0 0 360 150" preserveAspectRatio="none"></svg>
         </div>
         <div class="cmp-card">
           <div class="section-bar">
             <h3>Kích thước frontier (bộ nhớ)</h3>
-            <div class="tree-legend"><span><i class="dot lg-bfs"></i>BFS</span><span><i class="dot lg-dfs"></i>DFS</span></div>
+            <div class="tree-legend" id="cmpLegendFrontier"></div>
           </div>
           <svg id="cmpFrontierChart" class="cmp-chart" viewBox="0 0 360 150" preserveAspectRatio="none"></svg>
         </div>
@@ -257,8 +273,10 @@
           <span><i class="dot dot-amber"></i>Trong frontier</span>
           <span><i class="dot dot-sky"></i>Đã duyệt</span>
           <span><i class="dot dot-rose"></i>Trùng (bị cắt)</span>
+          <span id="legendStale" class="hidden"><i class="dot dot-slate"></i>Nút cũ (bị thay)</span>
           <span><i class="dot dot-emerald"></i>Lời giải</span>
           <span><i class="order-chip">k</i>thứ tự mở rộng</span>
+          <span id="legendCost" class="hidden"><b>g</b> = chi phí từ gốc</span>
         </div>
         <div id="treeViewport" class="tree-viewport" aria-label="Cây tìm kiếm">
           <svg id="treeSvg" class="tree-svg"></svg>
@@ -295,6 +313,7 @@
           <div class="kpi-card"><span class="kpi-label">Bị bỏ qua (trùng)</span><span id="kpiSkipped" class="kpi-val kpi-rose">0</span></div>
           <div class="kpi-card"><span class="kpi-label">Hàng đợi dài nhất</span><span id="kpiMaxFrontier" class="kpi-val kpi-indigo">0</span></div>
           <div class="kpi-card"><span class="kpi-label">Lời giải · nhánh TB</span><span id="kpiSolutionBranch" class="kpi-val kpi-emerald">—</span></div>
+          <div class="kpi-card"><span class="kpi-label">Chi phí lời giải</span><span id="kpiCost" class="kpi-val kpi-indigo">—</span></div>
         </div>
 
         <div id="solutionStripCard" class="solution-card hidden">
