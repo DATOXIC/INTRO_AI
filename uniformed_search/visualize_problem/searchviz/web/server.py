@@ -12,17 +12,32 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from api import PROBLEMS, handle  # noqa: F401  (PROBLEMS giữ lại cho tương thích)
+from .api import handle
 
-STATIC_DIR = Path(__file__).resolve().parent / "static"
+# Giao diện nằm ở thư mục ui/ cạnh package searchviz/
+UI_DIR = Path(__file__).resolve().parents[2] / "ui"
 MAX_BODY_BYTES = 65_536
 
-STATIC_ROUTES: dict[str, tuple[str, str]] = {
-    "/": ("index.html", "text/html; charset=utf-8"),
-    "/index.html": ("index.html", "text/html; charset=utf-8"),
-    "/styles.css": ("styles.css", "text/css; charset=utf-8"),
-    "/app.js": ("app.js", "application/javascript; charset=utf-8"),
+CONTENT_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
 }
+
+
+def resolve_static(path: str) -> tuple[Path, str] | None:
+    """Đổi đường dẫn URL thành (file trong ui/, content-type); chỉ phục vụ file nằm thẳng trong ui/."""
+    name = "index.html" if path == "/" else path.lstrip("/")
+    if not name or "/" in name or "\\" in name or name.startswith("."):
+        return None
+    content_type = CONTENT_TYPES.get(Path(name).suffix.lower())
+    file_path = UI_DIR / name
+    if content_type is None or not file_path.is_file():
+        return None
+    return file_path, content_type
 
 
 class DebuggerRequestHandler(BaseHTTPRequestHandler):
@@ -70,12 +85,9 @@ class DebuggerRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         path = urlparse(self.path).path
 
-        if path in STATIC_ROUTES:
-            filename, content_type = STATIC_ROUTES[path]
-            file_path = STATIC_DIR / filename
-            if not file_path.is_file():
-                self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": f"Không tìm thấy tệp giao diện {filename}."})
-                return
+        static = resolve_static(path)
+        if static is not None:
+            file_path, content_type = static
             self._send_bytes(HTTPStatus.OK, content_type, file_path.read_bytes())
             return
 

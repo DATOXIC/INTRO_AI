@@ -4,28 +4,47 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Search Interactive Debugger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" />
   <link rel="stylesheet" href="styles.css" />
+  <script src="theme.js"></script>
 </head>
 <body>
   <div class="app-shell">
 
     <!-- Đầu trang: chỉ tên + chọn đề + nút tùy chọn -->
     <header class="topbar">
-      <h1>Search Debugger</h1>
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="18" r="2.2"/><path d="M12 7.2v4.3M12 11.5 6.8 16M12 11.5l5.2 4.5"/></svg>
+        </span>
+        <div class="brand-text">
+          <h1>Search Debugger</h1>
+          <span class="brand-sub">Xem từng bước của thuật toán tìm kiếm</span>
+        </div>
+      </div>
       <div class="top-actions">
-        <div class="segmented" id="problemSelector" role="group" aria-label="Bài toán">
-          <button type="button" class="seg-btn active" data-problem="npuzzle">n-Puzzle</button>
-          <button type="button" class="seg-btn" data-problem="vacuum">Vacuum</button>
+        <div class="top-group">
+          <div class="segmented" id="problemSelector" role="group" aria-label="Bài toán">
+            <button type="button" class="seg-btn active" data-problem="npuzzle">n-Puzzle</button>
+            <button type="button" class="seg-btn" data-problem="vacuum">Vacuum</button>
+          </div>
+          <div class="segmented" id="algoSelector" role="group" aria-label="Thuật toán">
+            <button type="button" class="seg-btn active" data-algo="bfs">BFS</button>
+            <button type="button" class="seg-btn" data-algo="dfs">DFS</button>
+            <button type="button" class="seg-btn" data-algo="ucs" title="UCS đúng mã giả trên slide (có REPLACE nút trong frontier)">UCS</button>
+            <button type="button" class="seg-btn" data-algo="ucs_fast" title="UCS tối ưu: best_cost, nút cũ bị bỏ qua khi pop">UCS tối ưu</button>
+          </div>
+          <select id="presetSelect" class="select-input" aria-label="Chọn đề bài mẫu"></select>
         </div>
-        <div class="segmented" id="algoSelector" role="group" aria-label="Thuật toán">
-          <button type="button" class="seg-btn active" data-algo="bfs">BFS</button>
-          <button type="button" class="seg-btn" data-algo="dfs">DFS</button>
-          <button type="button" class="seg-btn" data-algo="ucs" title="UCS đúng mã giả trên slide (có REPLACE nút trong frontier)">UCS</button>
-          <button type="button" class="seg-btn" data-algo="ucs_fast" title="UCS tối ưu: best_cost, nút cũ bị bỏ qua khi pop">UCS tối ưu</button>
+        <span class="top-divider" aria-hidden="true"></span>
+        <div class="top-group">
+          <button type="button" id="compareBtn" class="btn btn-secondary" aria-pressed="false" title="Chạy hai thuật toán trên cùng bài toán rồi đặt cạnh nhau">⇄ So sánh</button>
+          <button type="button" id="optionsBtn" class="btn btn-secondary" aria-expanded="false" aria-controls="optionsPanel" title="Tùy chọn">⚙ Tùy chọn</button>
+          <button type="button" id="presentBtn" class="btn btn-icon" aria-pressed="false" title="Chế độ trình chiếu: chữ và bàn cờ to hơn (Esc để thoát)" aria-label="Chế độ trình chiếu">⛶</button>
+          <button type="button" id="themeBtn" class="btn btn-icon" title="Đổi giao diện sáng / tối" aria-label="Đổi giao diện sáng hoặc tối">◐</button>
         </div>
-        <button type="button" id="compareBtn" class="btn btn-secondary" aria-pressed="false" title="Chạy hai thuật toán trên cùng bài toán rồi đặt cạnh nhau">⇄ So sánh</button>
-        <select id="presetSelect" class="select-input" aria-label="Chọn đề bài mẫu"></select>
-        <button type="button" id="optionsBtn" class="btn btn-secondary" aria-expanded="false" aria-controls="optionsPanel" title="Tùy chọn">⚙ Tùy chọn</button>
       </div>
     </header>
 
@@ -100,6 +119,16 @@
       <span id="predictActions" class="predict-actions hidden"></span>
       <span id="predictScore" class="predict-score hidden"></span>
       <span id="solvabilityChip" class="solvability-chip hidden"></span>
+    </div>
+
+    <!-- Số liệu nhanh: luôn hiện, không phải mở mục Thống kê mới thấy -->
+    <div id="statbar" class="statbar" aria-label="Số liệu nhanh">
+      <div class="kpi-card"><span class="kpi-label">Đã mở rộng</span><span id="kpiExpanded" class="kpi-val">0</span></div>
+      <div class="kpi-card"><span class="kpi-label">Đã sinh</span><span id="kpiGenerated" class="kpi-val">0</span></div>
+      <div class="kpi-card"><span class="kpi-label">Bị bỏ qua (trùng)</span><span id="kpiSkipped" class="kpi-val kpi-rose">0</span></div>
+      <div class="kpi-card"><span class="kpi-label">Hàng đợi dài nhất</span><span id="kpiMaxFrontier" class="kpi-val kpi-indigo">0</span></div>
+      <div class="kpi-card"><span class="kpi-label">Lời giải · nhánh TB</span><span id="kpiSolutionBranch" class="kpi-val kpi-emerald">—</span></div>
+      <div class="kpi-card"><span class="kpi-label">Chi phí lời giải</span><span id="kpiCost" class="kpi-val kpi-indigo">—</span></div>
     </div>
 
     <main class="workspace">
@@ -205,6 +234,85 @@
             </div>
           </div>
         </div>
+
+        <!-- Cây tìm kiếm luôn hiện; với Vacuum có thêm đồ thị không gian trạng thái -->
+        <div id="vizRow" class="viz-row">
+          <section id="treeCard" class="viz-card" aria-label="Cây tìm kiếm">
+            <div class="viz-head">
+              <h2>Cây tìm kiếm</h2>
+              <div class="tree-zoom-controls">
+                <button type="button" id="treeZoomOut" class="btn btn-secondary btn-xs" aria-label="Thu nhỏ">−</button>
+                <button type="button" id="treeZoomFit" class="btn btn-secondary btn-xs" title="Tự co giãn vừa khung">Vừa khung</button>
+                <button type="button" id="treeZoomIn" class="btn btn-secondary btn-xs" aria-label="Phóng to">+</button>
+              </div>
+              <label class="toggle-chip toggle-sm">
+                <input type="checkbox" id="showPrunedToggle" checked />
+                <span>Hiện nhánh bị cắt</span>
+              </label>
+            </div>
+            <div class="tree-legend">
+              <span><i class="dot dot-indigo"></i>Đang mở rộng</span>
+              <span><i class="dot dot-yellow"></i>Đang thử</span>
+              <span><i class="dot dot-amber"></i>Trong frontier</span>
+              <span><i class="dot dot-sky"></i>Đã duyệt</span>
+              <span><i class="dot dot-rose"></i>Trùng (bị cắt)</span>
+              <span id="legendStale" class="hidden"><i class="dot dot-slate"></i>Nút cũ (bị thay)</span>
+              <span><i class="dot dot-emerald"></i>Lời giải</span>
+              <span><i class="order-chip">k</i>thứ tự mở rộng</span>
+              <span id="legendCost" class="hidden"><b>g</b> = chi phí từ gốc</span>
+            </div>
+            <div id="treeViewport" class="tree-viewport" aria-label="Cây tìm kiếm">
+              <svg id="treeSvg" class="tree-svg"></svg>
+            </div>
+          </section>
+
+          <section id="graphCard" class="viz-card hidden" aria-label="Không gian trạng thái">
+            <div class="viz-head">
+              <h2>Không gian trạng thái <small>chỉ 8 trạng thái</small></h2>
+            </div>
+            <div class="tree-legend">
+              <span><i class="dot dot-indigo"></i>Đang xét</span>
+              <span><i class="dot dot-sky"></i>Đã duyệt</span>
+              <span><i class="dot dot-amber"></i>Trong frontier</span>
+              <span><i class="dot dot-emerald"></i>Đích</span>
+              <span><b>×k</b> số nút trong cây</span>
+            </div>
+            <svg id="vacGraphSvg" class="vac-graph" viewBox="0 0 560 240" role="img" aria-label="Đồ thị 8 trạng thái của thế giới Vacuum"></svg>
+            <p class="viz-note">Cây bên cạnh có thể chứa <b>cùng một trạng thái nhiều lần</b> (×k), trong khi không gian trạng thái chỉ có 8 nút. Đó là lý do cần tập <code>explored</code>.</p>
+          </section>
+        </div>
+
+        <!-- Thống kê: gập mặc định -->
+        <details id="analysisCard" class="analysis-card">
+          <summary class="card-summary">
+            <h2>Thống kê</h2>
+            <span class="section-sub">Số liệu, bộ nhớ, lời giải</span>
+          </summary>
+
+          <div id="tab-telemetry" class="tab-panel active">
+            <div id="solutionStripCard" class="solution-card hidden">
+              <h3>Các bước của lời giải <small>(bấm để xem)</small></h3>
+              <div id="solutionStrip" class="solution-strip"></div>
+            </div>
+
+            <div class="chart-card">
+              <div class="section-bar">
+                <h3>Bộ nhớ tăng theo từng bước</h3>
+                <div class="tree-legend">
+                  <span><i class="dot dot-amber"></i>Hàng đợi</span>
+                  <span><i class="dot dot-sky"></i>Đã duyệt</span>
+                </div>
+              </div>
+              <svg id="memoryChartSvg" class="chart-svg" viewBox="0 0 640 210" preserveAspectRatio="none"></svg>
+            </div>
+
+            <details class="solvability-card">
+              <summary>Bài này có giải được không?</summary>
+              <p id="solvFormula" class="solv-formula"></p>
+              <p id="solvExplanation" class="solv-detail"></p>
+            </details>
+          </div>
+        </details>
       </section>
     </main>
 
@@ -252,93 +360,6 @@
       <div id="cmpSides" class="cmp-sides"></div>
     </section>
 
-    <!-- Cây tìm kiếm luôn hiện; với Vacuum có thêm đồ thị không gian trạng thái -->
-    <div id="vizRow" class="viz-row">
-      <section id="treeCard" class="viz-card" aria-label="Cây tìm kiếm">
-        <div class="viz-head">
-          <h2>Cây tìm kiếm</h2>
-          <div class="tree-zoom-controls">
-            <button type="button" id="treeZoomOut" class="btn btn-secondary btn-xs" aria-label="Thu nhỏ">−</button>
-            <button type="button" id="treeZoomFit" class="btn btn-secondary btn-xs" title="Tự co giãn vừa khung">Vừa khung</button>
-            <button type="button" id="treeZoomIn" class="btn btn-secondary btn-xs" aria-label="Phóng to">+</button>
-          </div>
-          <label class="toggle-chip toggle-sm">
-            <input type="checkbox" id="showPrunedToggle" checked />
-            <span>Hiện nhánh bị cắt</span>
-          </label>
-        </div>
-        <div class="tree-legend">
-          <span><i class="dot dot-indigo"></i>Đang mở rộng</span>
-          <span><i class="dot dot-yellow"></i>Đang thử</span>
-          <span><i class="dot dot-amber"></i>Trong frontier</span>
-          <span><i class="dot dot-sky"></i>Đã duyệt</span>
-          <span><i class="dot dot-rose"></i>Trùng (bị cắt)</span>
-          <span id="legendStale" class="hidden"><i class="dot dot-slate"></i>Nút cũ (bị thay)</span>
-          <span><i class="dot dot-emerald"></i>Lời giải</span>
-          <span><i class="order-chip">k</i>thứ tự mở rộng</span>
-          <span id="legendCost" class="hidden"><b>g</b> = chi phí từ gốc</span>
-        </div>
-        <div id="treeViewport" class="tree-viewport" aria-label="Cây tìm kiếm">
-          <svg id="treeSvg" class="tree-svg"></svg>
-        </div>
-      </section>
-
-      <section id="graphCard" class="viz-card hidden" aria-label="Không gian trạng thái">
-        <div class="viz-head">
-          <h2>Không gian trạng thái <small>chỉ 8 trạng thái</small></h2>
-        </div>
-        <div class="tree-legend">
-          <span><i class="dot dot-indigo"></i>Đang xét</span>
-          <span><i class="dot dot-sky"></i>Đã duyệt</span>
-          <span><i class="dot dot-amber"></i>Trong frontier</span>
-          <span><i class="dot dot-emerald"></i>Đích</span>
-          <span><b>×k</b> số nút trong cây</span>
-        </div>
-        <svg id="vacGraphSvg" class="vac-graph" viewBox="0 0 560 240" role="img" aria-label="Đồ thị 8 trạng thái của thế giới Vacuum"></svg>
-        <p class="viz-note">Cây bên cạnh có thể chứa <b>cùng một trạng thái nhiều lần</b> (×k), trong khi không gian trạng thái chỉ có 8 nút. Đó là lý do cần tập <code>explored</code>.</p>
-      </section>
-    </div>
-
-    <!-- Thống kê: gập mặc định -->
-    <details id="analysisCard" class="analysis-card">
-      <summary class="card-summary">
-        <h2>Thống kê</h2>
-        <span class="section-sub">Số liệu, bộ nhớ, lời giải</span>
-      </summary>
-
-      <div id="tab-telemetry" class="tab-panel active">
-        <div class="kpi-grid">
-          <div class="kpi-card"><span class="kpi-label">Đã mở rộng</span><span id="kpiExpanded" class="kpi-val">0</span></div>
-          <div class="kpi-card"><span class="kpi-label">Đã sinh</span><span id="kpiGenerated" class="kpi-val">0</span></div>
-          <div class="kpi-card"><span class="kpi-label">Bị bỏ qua (trùng)</span><span id="kpiSkipped" class="kpi-val kpi-rose">0</span></div>
-          <div class="kpi-card"><span class="kpi-label">Hàng đợi dài nhất</span><span id="kpiMaxFrontier" class="kpi-val kpi-indigo">0</span></div>
-          <div class="kpi-card"><span class="kpi-label">Lời giải · nhánh TB</span><span id="kpiSolutionBranch" class="kpi-val kpi-emerald">—</span></div>
-          <div class="kpi-card"><span class="kpi-label">Chi phí lời giải</span><span id="kpiCost" class="kpi-val kpi-indigo">—</span></div>
-        </div>
-
-        <div id="solutionStripCard" class="solution-card hidden">
-          <h3>Các bước của lời giải <small>(bấm để xem)</small></h3>
-          <div id="solutionStrip" class="solution-strip"></div>
-        </div>
-
-        <div class="chart-card">
-          <div class="section-bar">
-            <h3>Bộ nhớ tăng theo từng bước</h3>
-            <div class="tree-legend">
-              <span><i class="dot dot-amber"></i>Hàng đợi</span>
-              <span><i class="dot dot-sky"></i>Đã duyệt</span>
-            </div>
-          </div>
-          <svg id="memoryChartSvg" class="chart-svg" viewBox="0 0 640 210" preserveAspectRatio="none"></svg>
-        </div>
-
-        <details class="solvability-card">
-          <summary>Bài này có giải được không?</summary>
-          <p id="solvFormula" class="solv-formula"></p>
-          <p id="solvExplanation" class="solv-detail"></p>
-        </details>
-      </div>
-    </details>
   </div>
 
   <!-- Thanh phát gắn ở đáy màn hình (giống VisuAlgo / trình phát video) -->

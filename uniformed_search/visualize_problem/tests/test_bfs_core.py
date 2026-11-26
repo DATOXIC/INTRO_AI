@@ -9,27 +9,24 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from bfs_core import (
-    BFS,
+from searchviz.core import BFS, DFS, Problem, search_trace
+from searchviz.problems import get_presets
+from searchviz.problems.npuzzle import (
     BFS_trace,
-    DFS,
     DFS_trace,
-    Problem,
     actions_npuzzle,
     analyze_solvability,
     count_inversions,
-    get_presets,
     is_solvable,
     make_goal_board,
     manhattan_distance,
     misplaced_tiles,
     result_npuzzle,
-    search_trace,
     shuffle_solvable,
     validate_board,
 )
-from server import create_server
-from vacuum_world import (
+from searchviz.web.server import create_server
+from searchviz.problems.vacuum import (
     actions_vacuum,
     is_all_clean,
     make_vacuum_domain,

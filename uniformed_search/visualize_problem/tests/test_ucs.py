@@ -7,23 +7,27 @@ import itertools
 import unittest
 from typing import Any
 
-from api import handle
-from bfs_core import (
+from searchviz.core import (
+    ALGORITHMS,
     BFS,
-    NPUZZLE_MOVE_COSTS,
     UCS,
+    Domain,
+    Problem,
     UCS_fast,
+    get_source_lines,
+    search_trace,
+)
+from searchviz.problems import get_presets
+from searchviz.problems.npuzzle import (
+    NPUZZLE_MOVE_COSTS,
     actions_npuzzle,
     cost_npuzzle,
-    get_presets,
     make_goal_board,
     make_npuzzle_domain,
     result_npuzzle,
-    search_trace,
     shuffle_solvable,
 )
-from search_core import ALGORITHMS, Domain, Problem, get_source_lines
-from vacuum_world import (
+from searchviz.problems.vacuum import (
     MAX_ROOMS,
     MIN_ROOMS,
     VACUUM_MOVE_COSTS,
@@ -35,6 +39,7 @@ from vacuum_world import (
     validate_vacuum_state,
     vacuum_presets,
 )
+from searchviz.web.api import handle
 
 # Đồ thị nhỏ để ép xảy ra REPLACE: S→A tốn 5 nhưng S→B→A chỉ tốn 1+1.
 TOY_GRAPH: dict[str, dict[str, int]] = {

@@ -1,8 +1,8 @@
-"""n-Puzzle domain plus a compatibility facade over the generic search engine.
+"""Bài toán n-Puzzle: bảng k × k trượt ô (k = 2, 3, 4).
 
-The search algorithms and the step-by-step tracer live in ``search_core`` (they work for any
-problem); this module keeps the generalized k x k sliding puzzle and re-exports everything the
-rest of the project (server, tests, notebooks) already imports from here.
+Chỉ chứa phần riêng của n-Puzzle: trạng thái, hành động, chuyển trạng thái, kiểm tra giải được,
+đề mẫu và cách xử lý yêu cầu. Thuật toán và ghi vết nằm ở ``searchviz.core``.
+Chi phí: Lên/Xuống tốn 1, Trái/Phải tốn 2 (dùng cho UCS).
 """
 
 from __future__ import annotations
@@ -10,32 +10,10 @@ from __future__ import annotations
 import random
 from typing import Any
 
-from search_core import (  # noqa: F401  (re-exported for backwards compatibility)
-    ALGORITHMS,
-    BFS,
-    DFS,
-    UCS,
-    UCS_ALGORITHMS,
-    UCS_fast,
-    Domain,
-    Node,
-    Problem,
-    Queue,
-    Stack,
-    child_node,
-    dequeue,
-    enqueue,
-    get_source_lines,
-    is_empty,
-    is_goal,
-    pop,
-    push,
-    search_trace,
-    solution,
-    solution_node_ids,
-)
-from vacuum_world import vacuum_presets
+from ..core import Domain, get_source_lines, search_trace
+from .base import SolveOptions, parse_int
 
+KIND = "npuzzle"
 Board = tuple[tuple[int, ...], ...]
 Move = str
 ALLOWED_SIZES = (2, 3, 4)
@@ -266,7 +244,7 @@ def shuffle_solvable(
     return cur
 
 
-def _npuzzle_presets() -> list[dict[str, Any]]:
+def presets() -> list[dict[str, Any]]:
     """Return curated n-puzzle learning presets across 2x2, 3x3, and 4x4 sizes."""
     return [
         {
@@ -336,12 +314,7 @@ def _npuzzle_presets() -> list[dict[str, Any]]:
     ]
 
 
-# ── Trace domain + backwards-compatible wrappers ────────────────────────────
-
-def get_bfs_source_lines(graph_search: bool = True, early_goal_test: bool = True) -> list[dict[str, Any]]:
-    """Return the BFS pseudocode lines (kept for backwards compatibility)."""
-    return get_source_lines("bfs", graph_search, early_goal_test)
-
+# ── Domain dùng cho ghi vết ─────────────────────────────────────────────────
 
 NPUZZLE_MOVE_COSTS: dict[str, int] = {"Lên": 1, "Xuống": 1, "Trái": 2, "Phải": 2}
 
@@ -429,6 +402,82 @@ def DFS_trace(
     )
 
 
-def get_presets() -> list[dict[str, Any]]:
-    """Return all curated learning presets (n-Puzzle first, then Vacuum Robot)."""
-    return _npuzzle_presets() + vacuum_presets()
+# ── Xử lý yêu cầu từ API ────────────────────────────────────────────────────
+
+def _target_board(payload: dict[str, Any], size: int) -> Board:
+    raw_target = payload.get("target_board")
+    return validate_board(raw_target, expected_size=size) if raw_target is not None else make_goal_board(size)
+
+
+def solve(payload: dict[str, Any], options: SolveOptions) -> dict[str, Any]:
+    """Chạy thuật toán trên một đề n-Puzzle; đề vô nghiệm bị chặn trừ khi ``force_run``."""
+    raw_start = payload.get("start_board")
+    if raw_start is None:
+        raise ValueError("Thiếu trường 'start_board'.")
+    size = parse_int(payload.get("size"), "size", len(raw_start) if isinstance(raw_start, list) else 3, 2, 4)
+    start_board = validate_board(raw_start, expected_size=size)
+    target_board = _target_board(payload, size)
+
+    solvability = analyze_solvability(start_board, target_board)
+    if not solvability["solvable"] and not options.force_run:
+        return {
+            "status": "unsolvable_blocked",
+            "problem": KIND,
+            "algorithm": options.algorithm,
+            "size": size,
+            "start_board": [list(r) for r in start_board],
+            "target_board": [list(r) for r in target_board],
+            "config": {
+                "graph_search": options.graph_search,
+                "early_goal_test": options.early_goal_test,
+                "max_nodes": options.max_nodes,
+            },
+            "solvability": solvability,
+            "source_lines": get_source_lines(options.algorithm, options.graph_search, options.early_goal_test),
+            "nodes": [],
+            "steps": [],
+            "solution_ids": None,
+            "summary": None,
+        }
+
+    return search_trace(
+        make_npuzzle_domain(start_board, target_board),
+        algorithm=options.algorithm,
+        graph_search=options.graph_search,
+        early_goal_test=options.early_goal_test,
+        max_nodes=options.max_nodes,
+    )
+
+
+def shuffle(payload: dict[str, Any]) -> dict[str, Any]:
+    """Tạo đề ngẫu nhiên chắc chắn giải được bằng cách xáo ngược từ bảng đích."""
+    size = parse_int(payload.get("size"), "size", 3, 2, 4)
+    if size not in ALLOWED_SIZES:
+        raise ValueError(f"Kích thước phải thuộc {ALLOWED_SIZES}.")
+    steps = parse_int(payload.get("steps"), "steps", 5, 0, 50)
+    raw_seed = payload.get("seed")
+    seed = parse_int(raw_seed, "seed", 0, -2_147_483_648, 2_147_483_647) if raw_seed is not None else None
+
+    target_board = _target_board(payload, size)
+    shuffled = shuffle_solvable(target_board, steps=steps, seed=seed)
+    return {
+        "size": size,
+        "start_board": [list(r) for r in shuffled],
+        "target_board": [list(r) for r in target_board],
+        "solvability": analyze_solvability(shuffled, target_board),
+    }
+
+
+def check(payload: dict[str, Any]) -> dict[str, Any]:
+    """Kiểm tra bảng xuất phát hợp lệ và có giải được không."""
+    raw_start = payload.get("start_board")
+    if raw_start is None:
+        raise ValueError("Thiếu trường 'start_board'.")
+    start_board = validate_board(raw_start)
+    size = len(start_board)
+    target_board = _target_board(payload, size)
+    return {
+        "valid": True,
+        "size": size,
+        "solvability": analyze_solvability(start_board, target_board),
+    }

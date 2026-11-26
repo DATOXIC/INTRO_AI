@@ -12,8 +12,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from search_core import Domain, Move
+from ..core import Domain, Move, search_trace
+from .base import SolveOptions
 
+KIND = "vacuum"
 VacuumState = tuple  # (robot, dirt_0, ..., dirt_{n-1})
 MIN_ROOMS = 2
 MAX_ROOMS = 6
@@ -178,3 +180,20 @@ def vacuum_presets() -> list[dict[str, Any]]:
             ),
         ]
     return presets
+
+
+# ── Xử lý yêu cầu từ API ────────────────────────────────────────────────────
+
+presets = vacuum_presets
+
+
+def solve(payload: dict[str, Any], options: SolveOptions) -> dict[str, Any]:
+    """Chạy thuật toán trên một đề Vacuum (``start_state`` = {robot, dirt})."""
+    domain = make_vacuum_domain(validate_vacuum_state(payload.get("start_state")))
+    return search_trace(
+        domain,
+        algorithm=options.algorithm,
+        graph_search=options.graph_search,
+        early_goal_test=options.early_goal_test,
+        max_nodes=options.max_nodes,
+    )
