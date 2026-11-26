@@ -35,6 +35,7 @@ def ucs(initial_state, is_goal_func, get_successors_func):
     while frontier:
         cur_node = heapq.heappop(frontier)
 
+        # Nếu State hiện tại 
         if cur_node.path_cost > best_cost[cur_node.state]:
             continue
 
@@ -43,6 +44,7 @@ def ucs(initial_state, is_goal_func, get_successors_func):
 
         for action, cost, next_state in get_successors_func(cur_node.state):
             new_path_cost = cur_node.path_cost + cost
+
             if next_state not in best_cost or best_cost[next_state]>new_path_cost:
                 child_node = Node(
                     state=next_state,
