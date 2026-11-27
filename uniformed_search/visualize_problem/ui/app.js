@@ -39,7 +39,6 @@
     program_error: { text: "LỖI CHƯƠNG TRÌNH", cls: "pill-rose" },
   };
 
-  // DFS dùng ngăn xếp, UCS dùng hàng đợi ưu tiên: đổi từ ngữ của ba sự kiện liên quan tới frontier.
   const DFS_BADGES = {
     init: "PUSH NÚT GỐC",
     dequeue: "POP KHỎI NGĂN XẾP",
@@ -102,7 +101,6 @@
     },
   };
 
-  // Cầu nối cho các module bổ trợ (debugger.js, whatif.js): đọc trace, nhảy tới bước.
   window.SearchViz = {
     getTrace: () => state.trace,
     getStep: () => state.currentStep,
@@ -113,7 +111,6 @@
     },
     predictActive: () => state.predict.enabled,
     rerun: () => runSearch(false),
-    // Chạy lại đúng cấu hình hiện tại nhưng KHÔNG có chỉnh sửa, để so với bản đã sửa
     solveOriginal: () => apiJson("/api/solve", { method: "POST", body: JSON.stringify(buildPayload(true)) }),
   };
 
@@ -254,10 +251,6 @@
     return out;
   }
 
-  // ───────── Kết nối tới "backend" Python ─────────
-  // Hai chế độ, tự nhận biết:
-  //  - "server":  có server.py chạy cục bộ  -> gọi HTTP /api/...
-  //  - "pyodide": không có server (GitHub Pages) -> chạy chính mã Python trong trình duyệt
   let backendMode = null;
   let backendProbe = null;
   let worker = null;
@@ -393,7 +386,6 @@
         stopPlayback();
         return;
       }
-      // Điểm dừng: bước vừa tới thỏa một điều kiện thì tạm dừng phát
       const why = window.SearchDebugger && window.SearchDebugger.pausesAt(state.currentStep);
       if (why) {
         stopPlayback();
@@ -424,7 +416,6 @@
   const roomCols = (n) => (n <= 4 ? n : 3);
   const vacGoalText = (n) => (n > 2 ? "Tất cả các phòng đều sạch" : "Cả hai phòng đều sạch");
 
-  // Vẽ thế giới Vacuum: một dãy n phòng, robot (🤖) ở một phòng, phòng bẩn có bụi (🟤).
   function renderVacuum(container, st, opts = {}) {
     const n = st.dirt.length;
     container.innerHTML = "";
@@ -463,7 +454,6 @@
     });
   }
 
-  // Một hàm vẽ cho mọi bài toán: ma trận (n-Puzzle) hay object {robot, dirt} (Vacuum).
   function renderState(container, st, opts = {}) {
     if (st && !Array.isArray(st)) {
       renderVacuum(container, st, opts);
@@ -539,7 +529,6 @@
     st.dirt.forEach((dirty, i) => {
       const cell = document.createElement("div");
       cell.className = "mini-cell vac-cell" + (dirty ? " dirty" : "");
-      // Nhiều phòng thì chữ không đủ chỗ: bụi thể hiện bằng nền nâu của ô, ô chỉ ghi tên phòng và robot.
       cell.textContent = `${ROOM_NAMES[i]}${st.robot === i ? "🤖" : ""}${dirty && n < 4 ? "🟤" : ""}`;
       wrap.appendChild(cell);
     });
@@ -562,7 +551,6 @@
     }
   }
 
-  // Nút "nếu bỏ / đổi chỗ dòng này thì sao?" (whatif.js lo phần xử lý khi bấm)
   function buildLineTools(item) {
     if (item.locked && !item.can_up && !item.can_down) return null;
     const box = document.createElement("span");
@@ -684,7 +672,6 @@
     return p;
   }
 
-  // Cuộn riêng container để thẻ nổi bật luôn nằm trong tầm nhìn (không cuộn cả trang).
   function revealInside(container, el) {
     if (!el) return;
     const c = container.getBoundingClientRect();
@@ -695,8 +682,6 @@
     else if (r.left < c.left) container.scrollLeft -= c.left - r.left + 8;
   }
 
-  // Dải thẻ dùng chung cho frontier và explored. Phần giữa rút gọn thành "⋯ N nút ⋯",
-  // nhưng thẻ đang nổi bật (mới / trùng) luôn được giữ lại.
   const QUEUE_HEAD = 4;
   const QUEUE_TAIL = 4;
   const EXPLORED_TAIL = 6;
@@ -745,13 +730,10 @@
     const staleId = ev === "skip_stale" ? step.cur_id : null;
     const newId = ev === "enqueue" || ev === "init" || ev === "replace" ? step.candidate_id : null;
     const dupId = ev === "skip_frontier" ? step.collision_id : null;
-    // UCS: nút cùng trạng thái đang chờ sẵn trong frontier (đối tượng để so chi phí).
     const rivalId = ["dup_frontier", "better", "not_better"].includes(ev) ? step.collision_id : null;
     const ids = step.frontier_ids;
-    // Hàng đợi: nút kế tiếp ở ĐẦU (trái). Ngăn xếp: nút kế tiếp ở ĐỈNH (phải).
     const nextIdx = dfs ? ids.length - 1 : 0;
 
-    // "Bóng" của nút vừa pop (hoặc nút cũ vừa bị bỏ qua): nằm đúng chỗ nó vừa rời khỏi frontier.
     const ghostSpec =
       popId !== null
         ? { id: popId, cls: "card-popped", tag: { text: "POP ↓", cls: "pill-amber" } }
@@ -772,7 +754,6 @@
       optsFor: (id, i) => {
         const q = activePredictQuestion();
         if (q && q.type === "pop") {
-          // Đang hỏi "nút nào pop tiếp": che nhãn gợi ý và biến mỗi thẻ thành một lựa chọn.
           if (!q.answered) return { cls: "predict-choice" };
           if (id === q.answerId) return { cls: "predict-right", tag: { text: "ĐÁP ÁN", cls: "pill-emerald" }, highlight: true };
           if (id === q.choice) return { cls: "predict-wrong", tag: { text: "BẠN CHỌN", cls: "pill-rose" }, highlight: true };
@@ -829,9 +810,8 @@
   }
 
   function selectPinnedNode(nodeId) {
-    if (state.trace && state.trace.compare) return; // thẻ ở chế độ so sánh chỉ để xem
+    if (state.trace && state.trace.compare) return;
 
-    // Khi đang có câu hỏi dự đoán, bấm vào thẻ nghĩa là TRẢ LỜI, không phải xem chi tiết.
     const q = activePredictQuestion();
     if (q && !q.answered) {
       if (q.type === "pop" && state.trace.steps[state.currentStep].frontier_ids.includes(nodeId)) {
@@ -896,8 +876,6 @@
     els.jumpExpandedBtn.disabled = node.expanded_step === null || node.expanded_step === undefined;
   }
 
-  // ── Cây tìm kiếm: dùng chung cho chế độ thường và cho hai cây nhỏ khi so sánh ──
-
   function lineageOf(trace, nodeId) {
     const ids = [];
     let curr = trace.nodes[nodeId];
@@ -908,7 +886,6 @@
     return ids.reverse();
   }
 
-  // Thứ tự mở rộng (1, 2, 3, ...) của từng nút theo thời điểm nó bị pop khỏi frontier.
   function expandRanks(trace) {
     if (!trace._ranks) {
       const expanded = trace.nodes
@@ -936,18 +913,14 @@
     return el;
   }
 
-  // Vẽ cây tại bước stepIdx của một trace. o: { transform|null (null = tự vừa khung), pinnedId,
-  // showPruned, interactive }. Trả về { bounds, transform }.
   function drawSearchTree(svg, trace, stepIdx, o = {}) {
     svg.innerHTML = "";
     const step = trace.steps[stepIdx];
     const nodes = trace.nodes;
     const showPruned = o.showPruned !== false;
     const ucs = isUcs(trace.algorithm);
-    // UCS: nút cũ bị thay bằng nút rẻ hơn cùng trạng thái (từ bước thay trở đi).
     const isSuperseded = (n) => n.superseded_step !== null && n.superseded_step !== undefined && stepIdx >= n.superseded_step;
 
-    // Nút con chỉ bị coi là "trùng" từ bước kiểm tra trở đi (không tiết lộ trước).
     const isDupNow = (n) => n.is_duplicate && stepIdx >= (n.resolved_step ?? n.created_step);
     const visibleNodes = nodes.filter((n) => n.created_step <= stepIdx && (showPruned || !isDupNow(n)));
 
@@ -993,7 +966,7 @@
     }
     const bounds = { width: maxX, height: maxY };
     const tf = o.transform || fitTransform(svg, bounds);
-    const showText = tf.scale >= 0.4; // quá nhỏ thì bỏ chữ, chỉ giữ màu
+    const showText = tf.scale >= 0.4;
 
     const gRoot = svgEl("g", { transform: `translate(${tf.x}, ${tf.y}) scale(${tf.scale})` });
     svg.appendChild(gRoot);
@@ -1004,7 +977,6 @@
     const pinnedLineage = new Set(o.pinnedId !== null && o.pinnedId !== undefined ? lineageOf(trace, o.pinnedId) : []);
     const ranks = expandRanks(trace);
 
-    // Đường kẻ theo tầng
     const maxDepthDrawn = drawNodes.reduce((acc, n) => Math.max(acc, n.depth), 0);
     for (let d = 0; d <= maxDepthDrawn; d++) {
       const y = PAD_Y + d * LEVEL_DY;
@@ -1016,7 +988,6 @@
       }
     }
 
-    // Cạnh
     for (const n of drawNodes) {
       if (n.parent_id === null || !pos.has(n.parent_id) || !pos.has(n.id)) continue;
       const p1 = pos.get(n.parent_id);
@@ -1038,7 +1009,6 @@
       }
     }
 
-    // Nút
     for (const n of drawNodes) {
       const pt = pos.get(n.id);
       if (!pt) continue;
@@ -1095,7 +1065,6 @@
           g.appendChild(gl);
         }
 
-        // Huy hiệu thứ tự mở rộng: nút nào được pop trước, nút nào sau
         if (n.expanded_step !== null && n.expanded_step !== undefined && n.expanded_step <= stepIdx && ranks.has(n.id)) {
           g.appendChild(svgEl("circle", { cx: pt.x + 14, cy: pt.y - 14, r: 7.5, fill: "#0f172a" }));
           const rk = svgEl("text", { x: pt.x + 14, y: pt.y - 11, "text-anchor": "middle", "font-size": 8, "font-weight": 700, fill: "#ffffff" });
@@ -1142,8 +1111,6 @@
     renderSearchTree();
   }
 
-  // ── Đồ thị không gian trạng thái của Vacuum (8 trạng thái) ──
-  // Hai hàng = vị trí robot (A / B). Bốn cột = tổ hợp bụi, xếp thành vòng để các cạnh "Hút bụi" liền kề nhau.
   const VG = { cols: ["TT", "FT", "FF", "TF"], x0: 75, dx: 135, yA: 78, yB: 168, w: 84, h: 46 };
   const VG_ACTIONS = ["Trái", "Phải", "Hút bụi"];
   const VG_KEYS = [0, 1].flatMap((r) => VG.cols.map((c) => `${r}${c}`));
@@ -1182,7 +1149,6 @@
       const sign = p2.x > p1.x ? 1 : -1;
       return { d: `M ${p1.x + (sign * w) / 2} ${p1.y} L ${p2.x - (sign * w) / 2} ${p2.y}`, lx: (p1.x + p2.x) / 2, ly: p1.y - 7, anchor: "middle", label: "🧹" };
     }
-    // Cạnh dài (nối hai đầu của vòng): vẽ cung cong về phía ngoài hàng.
     const down = key0(from) === "1";
     const y0 = p1.y + (down ? h / 2 : -h / 2);
     const bow = down ? 48 : -48;
@@ -1201,7 +1167,6 @@
     const frontierKeys = new Set(step.frontier_ids.map(keyOf));
     const curKey = step.cur_id !== null && step.cur_id !== undefined ? keyOf(step.cur_id) : null;
 
-    // Phép thử hiện tại (nút con đang xét): cạnh từ trạng thái cha tới trạng thái con
     const childShown = step.candidate_id !== null && step.candidate_id !== undefined && CHILD_EVENTS.has(ev);
     let active = null;
     if (childShown) {
@@ -1217,12 +1182,10 @@
     }
     const candKey = active ? active.to : null;
 
-    // Cạnh thuộc đường lời giải
     const solEdges = new Set();
     const sol = step.solution_ids || [];
     for (let i = 1; i < sol.length; i++) solEdges.add(`${keyOf(sol[i - 1])}|${nodes[sol[i]].action}`);
 
-    // Số nút trong cây ứng với mỗi trạng thái, và thứ tự mở rộng đầu tiên
     const counts = {};
     const minRank = {};
     const ranks = expandRanks(trace);
@@ -1235,7 +1198,6 @@
       }
     }
 
-    // Mũi tên
     const defs = svgEl("defs");
     for (const [name, color] of Object.entries(VG_COLORS)) {
       const m = svgEl("marker", { id: `vgm-${name}`, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse" });
@@ -1244,7 +1206,6 @@
     }
     svg.appendChild(defs);
 
-    // Hai dải nền theo vị trí robot
     for (const [row, y, label] of [[0, VG.yA, "Robot ở A"], [1, VG.yB, "Robot ở B"]]) {
       svg.appendChild(svgEl("rect", { x: 2, y: y - 42, width: 556, height: 84, rx: 10, fill: row === 0 ? "#f8fafc" : "#f1f5f9" }));
       const t = svgEl("text", { x: 13, y, "text-anchor": "middle", "font-size": 10, fill: "#94a3b8", "font-weight": 700, transform: `rotate(-90 13 ${y})` });
@@ -1252,7 +1213,6 @@
       svg.appendChild(t);
     }
 
-    // Cạnh (bỏ qua các cạnh tự trỏ về chính nó: vẽ thành huy hiệu ↺)
     for (const key of VG_KEYS) {
       for (const action of VG_ACTIONS) {
         if (vgNext(key, action) === key) continue;
@@ -1273,7 +1233,6 @@
       }
     }
 
-    // Huy hiệu vòng lặp ↺ (hành động không đổi trạng thái)
     for (const key of VG_KEYS) {
       const loops = VG_ACTIONS.filter((a) => vgNext(key, a) === key);
       if (!loops.length) continue;
@@ -1288,7 +1247,6 @@
       svg.appendChild(t);
     }
 
-    // Nút (trạng thái)
     for (const key of VG_KEYS) {
       const pt = vgPos(key);
       const robot = Number(key[0]);
@@ -1369,7 +1327,6 @@
     const xOf = (i) => padL + (steps.length <= 1 ? 0 : (i / (steps.length - 1)) * plotW);
     const yOf = (v) => padT + plotH - (v / maxVal) * plotH;
 
-    // Horizontal grid lines
     for (let g = 0; g <= 4; g++) {
       const v = Math.round((maxVal * g) / 4);
       const y = yOf(v);
@@ -1409,7 +1366,6 @@
     pFr.setAttribute("points", frontierPts);
     svg.appendChild(pFr);
 
-    // Current step vertical marker
     const curX = xOf(state.currentStep);
     const curMetrics = steps[state.currentStep].metrics;
     const cursor = document.createElementNS(NS, "line");
@@ -1479,7 +1435,6 @@
     });
   }
 
-  // Vùng nào trên màn hình chịu tác động của dòng mã đang chạy.
   const FOCUS_ZONES = {
     init_root: ["cur"],
     check_root: ["cur"],
@@ -1520,7 +1475,6 @@
     document.querySelectorAll("[data-zone]").forEach((el) => {
       el.classList.toggle("zone-focus", zones.has(el.dataset.zone));
     });
-    // "Đèn sân khấu": khi có vùng được chiếu sáng thì phần còn lại mờ đi.
     els.stage.classList.toggle("has-focus", zones.size > 0);
   }
 
@@ -1549,8 +1503,6 @@
     el.querySelector(".check-text").innerHTML = html;
   }
 
-  // Bảng kiểm tra phản chiếu đúng các dòng `if child not in explored and ...` / `if is_goal(child)`
-  // (UCS: ba hàng là: chưa explored / chưa trong frontier / rẻ hơn nút cũ).
   function renderChecklist(step, cfg, algorithm) {
     const ucs = isUcs(algorithm);
     const fast = algorithm === "ucs_fast";
@@ -1679,7 +1631,6 @@
 
   const nodeBadge = (node, ucs) => `#${node.id} · ${ucs ? `g=${node.path_cost}` : `d=${node.depth}`}`;
 
-  // Bảng giá hành động (chỉ hiện với UCS): ↑ ↓ = 1 · ← → = 2
   function renderCostLegend(trace) {
     const costs = trace && trace.move_costs ? trace.move_costs : null;
     const show = Boolean(costs) && Object.keys(costs).length > 0 && isUcs(trace.algorithm);
@@ -1694,7 +1645,6 @@
     els.costLegend.textContent = `Chi phí: ${text.join(" · ")}`;
   }
 
-  // Khối "Nút đang xử lý": cur_node → child + các nước đi + bảng kiểm tra.
   function renderWork(step, trace) {
     const nodes = trace.nodes;
     const ev = step.event_type;
@@ -1709,7 +1659,6 @@
     const isGoalChild = ev === "goal_early";
     const isGoalCur = ev === "goal_late" || ev === "goal_init";
 
-    // cur_node
     els.curLabel.textContent = isRootPhase ? "root" : "cur_node";
     els.curNodeBadge.textContent = curNode ? nodeBadge(curNode, ucs) : "—";
     renderState(els.curBoardContainer, curNode ? curNode.state : null, {
@@ -1720,7 +1669,6 @@
       boardCls: ev === "dequeue" ? "board-popped" : isGoalCur ? "board-goal" : null,
     });
 
-    // child
     if (childShown) {
       els.candNodeBadge.textContent = nodeBadge(candNode, ucs);
       els.candNodeBadge.className = `mono-pill ${isDup ? "pill-rose" : isGoalChild ? "pill-emerald" : "pill-indigo"}`;
@@ -1743,7 +1691,6 @@
       renderState(els.candBoardContainer, null, { emptyText: "chưa sinh nút con" });
     }
 
-    // Phát lại hiệu ứng đúng thao tác vừa xảy ra
     for (const el of [els.curBoardContainer, els.candBoardContainer]) {
       el.classList.remove("fx-arrive", "fx-drop", "fx-dup");
     }
@@ -1752,7 +1699,6 @@
     if (ev === "gen_child") els.candBoardContainer.classList.add("fx-drop");
     if (isDup) els.candBoardContainer.classList.add("fx-dup");
 
-    // Các nước đi hợp lệ của ô trống (vòng lặp for move in actions)
     els.movesRow.innerHTML = "";
     const moves = curNode && !isRootPhase && ev !== "skip_stale" ? curNode.actions || [] : [];
     if (!moves.length) {
@@ -1839,7 +1785,6 @@
     els.nextBtn.disabled = atEnd;
     els.lastBtn.disabled = atEnd;
 
-    // Hero: dòng mã vừa chạy làm gì
     const algorithm = trace.algorithm || state.algorithm;
     const badge = badgeFor(step.event_type, algorithm);
     els.eventBadge.textContent = badge.text;
@@ -1847,7 +1792,6 @@
     els.eventMessage.textContent = step.message;
     applyFocus(step.event_type);
 
-    // Chỉ báo vô nghiệm: chỉ hiện khi có vấn đề, tránh nhiễu
     const solv = trace.solvability;
     if (solv.solvable) {
       els.solvabilityChip.classList.add("hidden");
@@ -1860,7 +1804,6 @@
     renderGoal(trace);
     renderWork(step, trace);
 
-    // Mã giả + giá trị biến
     els.modeSummaryTag.textContent = isUcs(algorithm)
       ? "Graph · Late Goal · ưu tiên theo g"
       : `${trace.config.graph_search ? "Graph" : "Tree"} · ${trace.config.early_goal_test ? "Early Goal" : "Late Goal"}`;
@@ -1868,13 +1811,11 @@
     els.legendCost.classList.toggle("hidden", !isUcs(algorithm));
     renderCodePanel(trace.source_lines, step.line, step.event_type, step.vars);
 
-    // Hàng đợi và explored
     els.frontierCountBadge.textContent = String(step.frontier_ids.length);
     els.exploredCountBadge.textContent = String(step.explored_ids.length);
     renderFrontierStrip(step, nodes, algorithm);
     renderExploredStrip(step, nodes, trace.config, algorithm);
 
-    // Thống kê
     const m = step.metrics;
     els.kpiExpanded.textContent = String(m.expanded);
     els.kpiGenerated.textContent = String(m.generated);
@@ -1989,10 +1930,6 @@
     }
   }
 
-  // ── Chế độ so sánh hai thuật toán ───────────────────────────────────────────
-  // Chạy hai thuật toán (chọn ở hai ô thả xuống) trên CÙNG bài toán/cấu hình, rồi đặt cạnh nhau. Một "tick" = một lần
-  // mở rộng nút (một lần pop), nên hai bên luôn cùng mở rộng nút thứ k tại mỗi thời điểm.
-
   const ALGO_ORDER = ["bfs", "dfs", "ucs", "ucs_fast"];
   const ALGO_COLORS = { bfs: "#4f46e5", dfs: "#0d9488", ucs: "#ea580c", ucs_fast: "#9333ea" };
   const CMP_HEAD = 3;
@@ -2017,7 +1954,6 @@
     return payload;
   }
 
-  // Từ một trace, tính mốc bước ứng với từng lần mở rộng và các chuỗi số liệu để vẽ biểu đồ.
   function deriveRun(algorithm, trace) {
     const steps = trace.steps;
     const dequeueIdx = [];
@@ -2025,7 +1961,6 @@
       if (st.event_type === "dequeue") dequeueIdx.push(i);
     });
     const n = dequeueIdx.length;
-    // tickEnd[k] = chỉ số bước ngay trước lần pop thứ k+1 (tức là khi lần mở rộng thứ k vừa xong).
     const tickEnd = [n > 0 ? dequeueIdx[0] - 1 : steps.length - 1];
     for (let k = 1; k <= n; k++) tickEnd.push((k < n ? dequeueIdx[k] : steps.length) - 1);
     const depthSeries = [0];
@@ -2124,7 +2059,6 @@
       lines.push(`Chỉ ${name(winner)} tìm được lời giải (${sm(winner).solution_length} bước, chi phí ${sm(winner).solution_cost}).`);
     }
 
-    // Hai bản UCS: khác nhau ở cách làm REPLACE, nhưng chỉ lộ ra khi thật sự có đường rẻ hơn tới nút đang chờ.
     const kinds = [a.algorithm, b.algorithm];
     if (kinds.includes("ucs") && kinds.includes("ucs_fast")) {
       const slide = a.algorithm === "ucs" ? a : b;
@@ -2153,7 +2087,6 @@
   }
 
   function buildCompareSides(problem, rooms) {
-    // Đồ thị trạng thái chỉ vẽ được cho Vacuum 2 phòng (8 trạng thái); nhiều phòng hơn thì hiện thế giới robot.
     const isVac = problem === "vacuum" && rooms === 2;
     els.cmpSides.innerHTML = "";
     state.compare.sides = state.compare.algos.map((algo) => {
@@ -2200,7 +2133,6 @@
         solution: q(".cmp-solution"),
       };
     });
-    // nhãn của khối "nút đang xét" là .cmp-work-label thứ hai
     state.compare.sides.forEach((side) => {
       side.workLabel = side.root.querySelectorAll(".cmp-work-label")[1];
     });
@@ -2219,16 +2151,13 @@
     const solved = trace.status === "solved";
     const cur = k >= 1 ? nodes[trace.steps[run.dequeueIdx[k - 1]].cur_id] : nodes[0];
 
-    // Trạng thái chạy
     const res = done ? resultLabel(trace.status) : { text: "đang chạy", cls: "pill-neutral" };
     side.status.textContent = res.text;
     side.status.className = `cmp-status status-pill ${res.cls}`;
     side.live.textContent = `mở rộng ${step.metrics.expanded} · sinh ${step.metrics.generated} · explored ${step.explored_ids.length} · bỏ qua ${step.metrics.skipped_explored + step.metrics.skipped_frontier}`;
 
-    // Cây tìm kiếm thu nhỏ (tự vừa khung): thấy ngay BFS rộng-nông còn DFS hẹp-sâu
     drawSearchTree(side.tree, trace, stepIdx, { transform: null, pinnedId: null, showPruned: true, interactive: false });
 
-    // frontier: các nút MỚI là con của nút vừa mở rộng; nút kế tiếp được đánh dấu theo quy tắc FIFO/LIFO
     const ids = step.frontier_ids;
     const fresh = new Set();
     if (k >= 1) {
@@ -2255,7 +2184,6 @@
       },
     });
 
-    // nút vừa mở rộng (hoặc nút đích khi đã xong)
     const goalNode = done && solved ? nodes[trace.solution_ids[trace.solution_ids.length - 1]] : null;
     const shown = goalNode || cur;
     if (side.graph) {
@@ -2276,7 +2204,6 @@
           ? `Nút CŨ #${shown.id} bị bỏ qua · ${where}`
           : `Nút vừa mở rộng #${shown.id} · ${where}`;
 
-    // đường đi lời giải
     if (done && solved) {
       const path = trace.solution_ids.slice(1).map((id) => MOVE_ARROWS[nodes[id].action] || nodes[id].action);
       side.solution.textContent = path.length
@@ -2426,7 +2353,6 @@
 
       state.compare.runs = results.map((trace, i) => deriveRun(state.compare.algos[i], trace));
       state.compare.maxTick = Math.max(...state.compare.runs.map((r) => r.n));
-      // Trace tổng hợp: mỗi "bước" là một lần mở rộng, để các nút điều khiển phát dùng lại nguyên vẹn.
       state.trace = {
         compare: true,
         steps: Array.from({ length: state.compare.maxTick + 1 }, () => ({ is_macro: true })),
@@ -2463,7 +2389,6 @@
     els.cmpAlgoB.value = state.compare.algos[1];
   }
 
-  // side = 0 (ô bên trái) hoặc 1 (ô bên phải) vừa được đổi. Hai bên không được trùng nhau.
   function onComparePicked(side) {
     const picked = [els.cmpAlgoA.value, els.cmpAlgoB.value];
     if (picked[0] === picked[1]) {
@@ -2493,9 +2418,8 @@
     hideAlert();
     state.compare.enabled = on;
     document.querySelector(".app-shell").classList.toggle("compare-on", on);
-    document.body.classList.toggle("compare-on", on); // thanh phát nằm ngoài .app-shell
+    document.body.classList.toggle("compare-on", on);
     if (on) {
-      // Mặc định so BFS với DFS; đang xem UCS thì so UCS với BFS (để thấy khác biệt về chi phí).
       state.compare.algos = isUcs(state.algorithm) ? ["bfs", state.algorithm] : ["bfs", "dfs"];
       syncComparePickers();
       setPredictMode(false);
@@ -2509,16 +2433,12 @@
     else runSearch(false);
   }
 
-  // ── Chế độ Dự đoán: tự đoán trước khi xem kết quả ───────────────────────────
-  // Hai loại câu hỏi: (1) nút nào sẽ được pop tiếp theo? (2) nút con vừa sinh ra là MỚI hay TRÙNG?
-
   function activePredictQuestion() {
     const pr = state.predict;
     if (!pr.enabled || !pr.pending || pr.pending.stepIdx !== state.currentStep) return null;
     return pr.pending;
   }
 
-  // Câu hỏi cần trả lời TRƯỚC khi đi từ bước idx sang bước idx+1 (hoặc null).
   function questionBefore(idx) {
     const steps = state.trace.steps;
     const cur = steps[idx];
@@ -2547,7 +2467,7 @@
       pr.pending = null;
       return;
     }
-    if (pr.pending && pr.pending.stepIdx === state.currentStep) return; // giữ nguyên (kể cả đã trả lời)
+    if (pr.pending && pr.pending.stepIdx === state.currentStep) return;
     const q = questionBefore(state.currentStep);
     pr.pending = q && !pr.answered.has(`${q.stepIdx}:${q.type}`) ? q : null;
   }
@@ -2605,7 +2525,6 @@
     renderStep();
   }
 
-  // Ghi đè dòng chú thích bằng câu hỏi / phản hồi khi đang ở một bước có câu hỏi.
   function renderPredictPrompt() {
     const pr = state.predict;
     els.caption.classList.remove("predict", "predict-right", "predict-wrong");
@@ -2666,12 +2585,12 @@
     pr.answered.clear();
     pr.score = { right: 0, total: 0 };
     document.querySelector(".app-shell").classList.toggle("predict-on", on);
-    document.body.classList.toggle("predict-on", on); // thanh phát nằm ngoài .app-shell
+    document.body.classList.toggle("predict-on", on);
     els.predictBtn.setAttribute("aria-pressed", String(on));
     els.predictBtn.classList.toggle("btn-primary", on);
     els.predictBtn.classList.toggle("btn-secondary", !on);
     if (on) {
-      state.stepMode = "micro"; // dự đoán cần đi từng dòng mã
+      state.stepMode = "micro";
       els.stepModeSelector.querySelectorAll(".seg-btn").forEach((b) => {
         b.classList.toggle("active", b.dataset.mode === "micro");
       });
@@ -2680,8 +2599,6 @@
     if (state.trace && !state.trace.compare) renderStep();
     else renderPredictPrompt();
   }
-
-  // ── Chọn bài toán / thuật toán / đề mẫu ─────────────────────────────────────
 
   const vacRooms = () => state.vacStart.dirt.length;
 
@@ -2710,7 +2627,6 @@
     els.presetSelect.appendChild(customOpt);
   }
 
-  // Dựng lại ba nhóm điều khiển của Vacuum theo số phòng hiện tại (rẻ nên dựng lại mỗi lần đổi).
   function syncVacuumControls() {
     const n = vacRooms();
 
@@ -2772,7 +2688,6 @@
     els.algoSelector.querySelectorAll(".seg-btn").forEach((b) => {
       b.classList.toggle("active", b.dataset.algo === state.algorithm);
     });
-    // UCS luôn là Graph Search + Late Goal (đúng slide): khóa hai tùy chọn và giải thích vì sao.
     const ucs = isUcs(state.algorithm);
     for (const toggle of [els.graphSearchToggle, els.earlyGoalToggle]) {
       toggle.disabled = ucs;
@@ -2797,7 +2712,6 @@
     if (run) await runSearch(false);
   }
 
-  // Đổi số phòng: quay về đề "tất cả bẩn, robot ở phòng đầu" của số phòng mới.
   async function setVacRooms(count) {
     if (count === vacRooms()) return;
     stopPlayback();
@@ -2819,17 +2733,14 @@
     runSearch(false);
   }
 
-  // Bước theo chế độ đang chọn; giữ Shift để dùng chế độ còn lại.
   function stepBy(delta, invert = false) {
     const macro = (state.stepMode === "macro") !== invert;
     if (macro) stepMacro(delta);
     else stepMicro(delta);
   }
 
-  // Dịch bước hiện tại: macro = nhảy tới lần pop kế tiếp, micro = đúng một dòng mã.
   function moveStep(delta, macro) {
     if (!state.trace || !state.trace.steps.length) return false;
-    // Chế độ Dự đoán: chưa trả lời câu hỏi thì chưa được đi tiếp.
     const q = activePredictQuestion();
     if (delta > 0 && !macro && q && !q.answered) {
       flashCaption();
@@ -2881,7 +2792,6 @@
     }
   }
 
-  // Board Editor Modal
   function getDraftBoard() {
     return state.editor.activeTarget === "start"
       ? state.editor.draftStart
@@ -2986,7 +2896,6 @@
     els.editorModal.classList.add("hidden");
   }
 
-  // Wire up events
   function setupEventListeners() {
     els.sizeSelector.addEventListener("click", (e) => {
       const btn = e.target.closest(".seg-btn");
@@ -3114,7 +3023,6 @@
       }
     });
 
-    // Tabs
     document.querySelectorAll(".tab-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const tab = btn.dataset.tab;
@@ -3135,7 +3043,6 @@
       });
     });
 
-    // Pinned node drawer
     els.closePinnedBtn.addEventListener("click", () => {
       state.pinnedNodeId = null;
       renderPinnedNode();
@@ -3160,7 +3067,6 @@
       }
     });
 
-    // Tree zoom & pan
     els.showPrunedToggle.addEventListener("change", renderSearchTree);
     els.treeZoomIn.addEventListener("click", () => {
       state.treeAutoFit = false;
@@ -3198,7 +3104,6 @@
       renderSearchTree();
     }, { passive: false });
 
-    // Click chart to jump step
     els.memoryChartSvg.addEventListener("click", (e) => {
       if (!state.trace || state.trace.steps.length <= 1) return;
       const rect = els.memoryChartSvg.getBoundingClientRect();
@@ -3211,7 +3116,6 @@
       renderStep();
     });
 
-    // Editor modal
     els.editBoardBtn.addEventListener("click", openEditorModal);
     els.closeEditorBtn.addEventListener("click", closeEditorModal);
     els.cancelEditorBtn.addEventListener("click", closeEditorModal);
@@ -3250,7 +3154,6 @@
       runSearch(false);
     });
 
-    // Keyboard shortcuts
     window.addEventListener("keydown", (e) => {
       const tag = document.activeElement?.tagName;
       if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;

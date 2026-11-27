@@ -41,7 +41,6 @@ class ApplyEditsTests(unittest.TestCase):
         )
         self.assertEqual(disabled, frozenset())
         tags = [l["tag"] for l in render_lines(prog, disabled)]
-        # add_explored được kéo lên đầu khối; dequeue và for_move giữ thứ tự cũ phía sau
         self.assertEqual(tags[tags.index("while_loop") + 1:][:3], ["add_explored", "dequeue", "for_move"])
         self.assertEqual(applied["order"], {"while_loop": ["add_explored", "dequeue", "for_move"]})
 

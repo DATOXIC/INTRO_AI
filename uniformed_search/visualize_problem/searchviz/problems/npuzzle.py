@@ -314,8 +314,6 @@ def presets() -> list[dict[str, Any]]:
     ]
 
 
-# ── Domain dùng cho ghi vết ─────────────────────────────────────────────────
-
 NPUZZLE_MOVE_COSTS: dict[str, int] = {"Lên": 1, "Xuống": 1, "Trái": 2, "Phải": 2}
 
 
@@ -401,8 +399,6 @@ def DFS_trace(
         max_nodes=max_nodes,
     )
 
-
-# ── Xử lý yêu cầu từ API ────────────────────────────────────────────────────
 
 def _target_board(payload: dict[str, Any], size: int) -> Board:
     raw_target = payload.get("target_board")

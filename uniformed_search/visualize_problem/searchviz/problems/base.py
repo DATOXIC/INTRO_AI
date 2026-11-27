@@ -15,7 +15,7 @@ class SolveOptions:
     early_goal_test: bool = True
     max_nodes: int = 300
     force_run: bool = False
-    edits: Any = None  # chỉnh sửa mã giả {disabled, order}, xem core/program.py
+    edits: Any = None
 
 
 def parse_bool(value: Any, name: str, default: bool) -> bool:

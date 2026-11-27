@@ -7,8 +7,6 @@ from typing import Any
 from .models import Move, Node, Problem
 
 
-# ── Frontier data structures ────────────────────────────────────────────────
-
 def Queue() -> list[Node]:
     """Create an empty FIFO queue."""
     return []

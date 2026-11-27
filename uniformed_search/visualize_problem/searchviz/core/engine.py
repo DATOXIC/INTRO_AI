@@ -17,10 +17,8 @@ from .program import Program, Stmt
 from .pseudocode import _vocabulary
 from .recorder import Recorder
 
-# Tín hiệu điều khiển luồng trả về từ mỗi lệnh
 NEXT, CONT_FOR, CONT_WHILE, DONE = range(4)
 
-# Biến -> dòng tạo ra nó, dùng để giải thích lỗi "dùng biến chưa tạo"
 DEFINERS = {
     "frontier": "init_queue",
     "explored": "init_explored",
@@ -64,13 +62,12 @@ class Engine:
         self.source_lines = source_lines
         self.line_info = {item["tag"]: item for item in source_lines}
         tags = {item["tag"] for item in source_lines}
-        # UCS tối ưu đếm "đã mở rộng" ở dòng check_stale (nút cũ không tính); không có dòng đó thì đếm ngay khi pop
         self.counts_in_dequeue = not (self.fam == "fast" and "check_stale" in tags and "check_stale" not in disabled)
 
-        self.frontier: list[Any] | None = None  # Node (FIFO/LIFO) hoặc (g, thứ tự vào, Node) (hàng đợi ưu tiên)
+        self.frontier: list[Any] | None = None
         self.explored_map: dict[Any, int] | None = None
-        self.frontier_map: dict[Any, int] = {}  # BFS/DFS: trạng thái -> nút đang chờ trong frontier
-        self.in_frontier: dict[Any, tuple[int, int, Node]] = {}  # UCS slide: trạng thái -> mục trong frontier
+        self.frontier_map: dict[Any, int] = {}
+        self.in_frontier: dict[Any, tuple[int, int, Node]] = {}
         self.best_cost: dict[Any, int] | None = None
         self.best_node: dict[Any, int] = {}
         self.arrival = count()
@@ -96,7 +93,6 @@ class Engine:
         self.steps = self.rec.steps
         self.metrics = self.rec.metrics
 
-    # ── tiện ích ───────────────────────────────────────────────────────────
     def f_ids(self) -> list[int]:
         if self.frontier is None:
             return []
@@ -129,7 +125,7 @@ class Engine:
 
     def put(self, node: Node) -> tuple[int, int, Node]:
         entry = (node.path_cost, next(self.arrival), node)
-        bisect.insort(self.frontier, entry)  # type: ignore[arg-type]
+        bisect.insort(self.frontier, entry)
         return entry
 
     def mark_expanded(self, cur: Node) -> None:
@@ -142,7 +138,6 @@ class Engine:
         rec["duplicate_of"] = of
         rec["duplicate_reason"] = reason
 
-    # ── điều khiển luồng ───────────────────────────────────────────────────
     def run(self) -> None:
         try:
             self.run_block(self.program.body)
@@ -178,7 +173,7 @@ class Engine:
                 return self.run_block(cur.body)
             if outcome == "skip":
                 return NEXT
-            cur = cur.orelse  # "next": thử nhánh elif
+            cur = cur.orelse
         return NEXT
 
     def exec_while(self, st: Stmt) -> int:
@@ -213,7 +208,6 @@ class Engine:
                 return signal
         return NEXT
 
-    # ── dòng khởi tạo ──────────────────────────────────────────────────────
     def h_init_root(self, st: Stmt) -> int:
         nid = self.next_id
         self.next_id += 1
@@ -293,7 +287,6 @@ class Engine:
         )
         return NEXT
 
-    # ── thân vòng while ────────────────────────────────────────────────────
     def h_dequeue(self, st: Stmt) -> int:
         self.need("frontier", st)
         frontier = self.frontier
@@ -385,7 +378,6 @@ class Engine:
         )
         return NEXT
 
-    # ── thân vòng for ──────────────────────────────────────────────────────
     def h_make_child(self, st: Stmt) -> int:
         self.need("cur_node", st)
         cur = self.cur
@@ -424,7 +416,6 @@ class Engine:
         )
         self.nodes[cand.node_id]["resolved_step"] = step
 
-    # c_<tag>: điều kiện của dòng if/elif, trả về "taken" | "skip" | "next"
     def c_check_duplicate(self, st: Stmt) -> str:
         self.need("child", st)
         self.need("explored", st)
@@ -461,7 +452,6 @@ class Engine:
             )
             return "next"
 
-        # BFS / DFS (Graph Search)
         in_frontier = (not in_explored) and (cand.state in self.frontier_map)
         if in_explored or in_frontier:
             holder = explored[cand.state] if in_explored else self.frontier_map[cand.state]
@@ -487,7 +477,7 @@ class Engine:
         )
         return "taken"
 
-    def c_check_better(self, st: Stmt) -> str:  # elif của UCS slide
+    def c_check_better(self, st: Stmt) -> str:
         self.need("child", st)
         self.need("frontier", st)
         cur, cand, old_entry = self.cur, self.cand, self.dup_entry
@@ -514,7 +504,7 @@ class Engine:
         )
         return "taken"
 
-    def c_check_best(self, st: Stmt) -> str:  # UCS tối ưu
+    def c_check_best(self, st: Stmt) -> str:
         self.need("child", st)
         self.need("best_cost", st)
         cur, cand, best = self.cur, self.cand, self.best_cost
@@ -545,7 +535,7 @@ class Engine:
         )
         return "taken"
 
-    def h_check_explored_child(self, st: Stmt) -> int:  # UCS tối ưu: if child.state in explored: continue
+    def h_check_explored_child(self, st: Stmt) -> int:
         self.need("child", st)
         self.need("explored", st)
         cur, cand, explored = self.cur, self.cand, self.explored_map
@@ -669,7 +659,6 @@ class Engine:
         self.nodes[cid]["resolved_step"] = step
         return NEXT
 
-    # ── kết thúc ───────────────────────────────────────────────────────────
     def h_return_none(self, st: Stmt) -> int:
         self.record(
             "failure", st.tag, "Frontier rỗng mà chưa thấy đích → không có lời giải.", True, None,

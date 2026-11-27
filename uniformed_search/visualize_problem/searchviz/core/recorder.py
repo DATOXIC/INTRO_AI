@@ -61,15 +61,11 @@ class Recorder:
             "duplicate_of": duplicate_of,
             "duplicate_reason": duplicate_reason,
             "created_step": created_step,
-            # Bước mà số phận của nút được quyết định (bị cắt hoặc được đưa vào frontier). Giao diện
-            # dùng mốc này để không "tiết lộ trước" việc nút con bị trùng khi mới vừa sinh ra.
             "resolved_step": None,
             "expanded_step": None,
-            # UCS: nút này thay (replaces) hoặc bị thay (superseded_by) một nút khác cùng trạng thái.
             "replaces": None,
             "superseded_by": None,
             "superseded_step": None,
-            # UCS tối ưu: nút cũ bị bỏ qua khi pop.
             "discarded_step": None,
         }
         self.nodes.append(rec)

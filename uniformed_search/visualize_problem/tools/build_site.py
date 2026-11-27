@@ -46,9 +46,7 @@ def main() -> None:
         shutil.copy2(ROOT / rel, target)
     (py_dir / "manifest.json").write_text(json.dumps({"files": files}, indent=2), encoding="utf-8")
 
-    # GitHub Pages mặc định chạy Jekyll; tắt đi để mọi file được phục vụ nguyên trạng.
     (DIST / ".nojekyll").write_text("", encoding="utf-8")
-    # Console Windows hay dùng bảng mã cũ (cp1252) và không in được tiếng Việt
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     print(f"Đã tạo {DIST} với {len(files)} file Python: {', '.join(files)}")

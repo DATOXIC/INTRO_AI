@@ -1,9 +1,3 @@
-/* "Nếu bỏ lệnh này thì sao?": tắt một dòng mã giả hoặc đổi chỗ hai dòng rồi chạy lại thật.
- *
- * Chỉnh sửa gửi lên máy chủ (hoặc Pyodide) dưới dạng {disabled: [tag], order: {khối: [tag]}}; Python chạy
- * đúng chương trình đã sửa và trả về vết mới. Module này giữ trạng thái chỉnh sửa, xử lý nút bấm trên từng
- * dòng mã, và so kết quả của bản sửa với bản gốc.
- */
 (() => {
   "use strict";
 
@@ -12,8 +6,8 @@
 
   const state = {
     disabled: new Set(),
-    order: {},        // {khối: [tag theo thứ tự mới]}
-    token: 0,         // để bỏ kết quả so sánh cũ nếu người dùng đã sửa tiếp
+    order: {},
+    token: 0,
   };
 
   const STATUS_TEXT = {
@@ -37,7 +31,6 @@
     renderBox(null, null);
   }
 
-  // ── Bấm nút trên từng dòng ─────────────────────────────────────────────────
   function currentLines() {
     const t = host() && host().getTrace();
     return t && t.source_lines ? t.source_lines : [];
@@ -49,7 +42,6 @@
   }
 
   function move(tag, block, dir) {
-    // Thứ tự hiện tại của các "đơn vị" trong khối (dòng if + nhánh elif đi cùng nhau)
     const tags = currentLines().filter((l) => l.block === block && l.unit).map((l) => l.tag);
     const i = tags.indexOf(tag);
     const j = i + dir;
@@ -72,7 +64,6 @@
     host().rerun();
   }
 
-  // ── Hộp so sánh với bản gốc ────────────────────────────────────────────────
   function metric(trace) {
     const s = trace.summary || {};
     return {
@@ -177,7 +168,7 @@
     renderBox(null, null);
     try {
       const base = await host().solveOriginal();
-      if (mine !== state.token) return; // người dùng đã sửa tiếp
+      if (mine !== state.token) return;
       renderBox(editTrace, base);
     } catch (err) {
       const note = $("whatifInsight");
@@ -188,7 +179,7 @@
   window.SearchWhatIf = { getEdits, reset, onTrace };
 
   document.addEventListener("DOMContentLoaded", () => {
-    $("codeLinesContainer").addEventListener("click", onToolClick, true); // bắt trước khi debugger.js chạy tới dòng
+    $("codeLinesContainer").addEventListener("click", onToolClick, true);
     $("whatifResetBtn").addEventListener("click", () => {
       reset();
       host().rerun();

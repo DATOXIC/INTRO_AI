@@ -13,7 +13,6 @@
 <body>
   <div class="app-shell">
 
-    <!-- Đầu trang: chỉ tên + chọn đề + nút tùy chọn -->
     <header class="topbar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">
@@ -48,7 +47,6 @@
       </div>
     </header>
 
-    <!-- Tùy chọn: ẩn mặc định -->
     <section id="optionsPanel" class="options-panel hidden" aria-label="Tùy chọn">
       <div class="option-block vac-only hidden">
         <span class="control-label">Số phòng</span>
@@ -112,7 +110,6 @@
 
     <section id="alertBanner" class="alert-banner hidden" role="status" aria-live="polite"></section>
 
-    <!-- MỘT dòng chú thích: bước này đang làm gì -->
     <div id="caption" class="caption" aria-live="polite">
       <span id="eventBadge" class="status-pill pill-neutral">SẴN SÀNG</span>
       <span id="eventMessage" class="caption-text">Nhấn ▶ Phát hoặc "Tiến" để bắt đầu.</span>
@@ -121,7 +118,6 @@
       <span id="solvabilityChip" class="solvability-chip hidden"></span>
     </div>
 
-    <!-- Số liệu nhanh: luôn hiện, không phải mở mục Thống kê mới thấy -->
     <div id="statbar" class="statbar" aria-label="Số liệu nhanh">
       <div class="kpi-card"><span class="kpi-label">Đã mở rộng</span><span id="kpiExpanded" class="kpi-val">0</span></div>
       <div class="kpi-card"><span class="kpi-label">Đã sinh</span><span id="kpiGenerated" class="kpi-val">0</span></div>
@@ -133,7 +129,6 @@
 
     <main class="workspace">
 
-      <!-- Trái: mã giả, dòng đang chạy sáng lên -->
       <section class="code-col">
         <div class="code-head">
           <span id="codeTitle">Mã giả BFS</span>
@@ -152,7 +147,6 @@
           <div id="whatifDiff" class="whatif-diff"></div>
         </div>
 
-        <!-- Bộ gỡ lỗi: điểm dừng, theo dõi, quy luật -->
         <div class="debug-box" id="debugBox">
           <div class="debug-toolbar" role="toolbar" aria-label="Điểm dừng và bước chạy">
             <button type="button" id="bpPrevBtn" class="btn btn-secondary btn-xs" title="Lùi tới điểm dừng trước (Shift+F8)">⏮ Dừng trước</button>
@@ -179,11 +173,9 @@
         </div>
       </section>
 
-      <!-- Phải: SÂN KHẤU duy nhất -->
       <section class="stage-col">
         <div class="stage" id="stage">
 
-          <!-- 1. frontier -->
           <div class="stage-block" data-zone="frontier">
             <div class="block-head">
               <span class="block-title"><i class="dot dot-amber"></i>frontier <small id="frontierKind">hàng đợi FIFO</small> <span id="frontierCountBadge" class="count-pill pill-amber">0</span></span>
@@ -192,7 +184,6 @@
             <div id="frontierList" class="queue-strip"></div>
           </div>
 
-          <!-- 2. nút đang xử lý -->
           <div class="stage-block work-block">
             <div class="work-grid">
               <div class="boards-stage">
@@ -243,7 +234,6 @@
             </div>
           </div>
 
-          <!-- 3. explored -->
           <div class="stage-block" data-zone="explored">
             <div class="block-head">
               <span class="block-title"><i class="dot dot-sky"></i>explored <small>đã mở rộng xong</small> <span id="exploredCountBadge" class="count-pill pill-sky">0</span></span>
@@ -252,7 +242,6 @@
           </div>
         </div>
 
-        <!-- Chi tiết một nút (hiện khi bấm vào một thẻ) -->
         <div id="pinnedNodeBar" class="pinned-drawer hidden">
           <div class="pinned-header">
             <strong id="pinnedTitle">Chi tiết nút</strong>
@@ -271,7 +260,6 @@
           </div>
         </div>
 
-        <!-- Cây tìm kiếm luôn hiện; với Vacuum có thêm đồ thị không gian trạng thái -->
         <div id="vizRow" class="viz-row">
           <section id="treeCard" class="viz-card" aria-label="Cây tìm kiếm">
             <div class="viz-head">
@@ -318,7 +306,6 @@
           </section>
         </div>
 
-        <!-- Thống kê: gập mặc định -->
         <details id="analysisCard" class="analysis-card">
           <summary class="card-summary">
             <h2>Thống kê</h2>
@@ -353,7 +340,6 @@
     </main>
 
 
-    <!-- Chế độ so sánh: hai thuật toán tùy chọn trên cùng bài toán, bước đồng bộ theo số lần mở rộng nút -->
     <section id="compareView" class="compare-view" aria-label="So sánh hai thuật toán">
       <div class="cmp-pickers">
         <label class="cmp-picker"><span>Bên trái</span>
@@ -398,7 +384,6 @@
 
   </div>
 
-  <!-- Thanh phát gắn ở đáy màn hình (giống VisuAlgo / trình phát video) -->
   <footer class="dock" aria-label="Điều khiển bước chạy">
     <div class="dock-inner">
       <div class="playback-buttons">
@@ -431,7 +416,6 @@
     </div>
   </footer>
 
-  <!-- Hộp thoại sửa bảng -->
   <div id="editorModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
     <div class="modal-dialog">
       <div class="modal-header">

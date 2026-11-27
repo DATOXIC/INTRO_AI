@@ -16,7 +16,6 @@ from typing import Any
 
 from . import npuzzle, vacuum
 
-# Thứ tự ở đây là thứ tự hiển thị của các đề mẫu.
 PROBLEMS = {
     npuzzle.KIND: npuzzle,
     vacuum.KIND: vacuum,

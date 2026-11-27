@@ -14,7 +14,6 @@ from urllib.parse import urlparse
 
 from .api import handle
 
-# Giao diện nằm ở thư mục ui/ cạnh package searchviz/
 UI_DIR = Path(__file__).resolve().parents[2] / "ui"
 MAX_BODY_BYTES = 65_536
 
@@ -120,7 +119,6 @@ def create_server(host: str = "127.0.0.1", port: int = 8765) -> ThreadingHTTPSer
 
 
 def main() -> None:
-    # Terminal Windows hay dùng cp1252: ép UTF-8 để không sập khi in tiếng Việt.
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is not None:

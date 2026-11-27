@@ -39,7 +39,6 @@ def search_trace(
     if not (1 <= max_nodes <= 3000):
         raise ValueError("max_nodes phải nằm trong khoảng [1, 3000].")
     if algorithm in UCS_ALGORITHMS:
-        # UCS luôn là Graph Search và kiểm tra đích khi pop (đúng slide), bất kể hai tùy chọn kia.
         graph_search, early_goal_test = True, False
 
     program, disabled, applied = apply_edits(build_program(algorithm, graph_search, early_goal_test), edits)

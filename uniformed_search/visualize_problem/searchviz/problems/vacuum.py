@@ -16,7 +16,7 @@ from ..core import Domain, Move, search_trace
 from .base import SolveOptions
 
 KIND = "vacuum"
-VacuumState = tuple  # (robot, dirt_0, ..., dirt_{n-1})
+VacuumState = tuple
 MIN_ROOMS = 2
 MAX_ROOMS = 6
 ROOM_NAMES = "ABCDEF"
@@ -181,8 +181,6 @@ def vacuum_presets() -> list[dict[str, Any]]:
         ]
     return presets
 
-
-# ── Xử lý yêu cầu từ API ────────────────────────────────────────────────────
 
 presets = vacuum_presets
 

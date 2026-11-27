@@ -11,13 +11,9 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 Move = str
-# "ucs"      : đúng mã giả trên slide (có REPLACE nút trong frontier).
-# "ucs_fast" : bản tối ưu (best_cost + bỏ qua nút cũ khi pop), kết quả giống "ucs" nhưng không phải tìm trong frontier.
 ALGORITHMS = ("bfs", "dfs", "ucs", "ucs_fast")
 UCS_ALGORITHMS = ("ucs", "ucs_fast")
 
-# Mỗi bước trong trace chứa danh sách frontier/explored, nên tổng kích thước tỉ lệ ~ steps × |lists|.
-# Giới hạn tổng số phần tử để phản hồi JSON không phình ra hàng trăm MB (đặc biệt với DFS / Tree Search).
 MAX_TRACE_ELEMENTS = 3_000_000
 
 
@@ -38,7 +34,7 @@ class Node:
         self.action = action
         self.depth = depth
         self.node_id = node_id
-        self.path_cost = path_cost  # g(n): tổng chi phí từ nút gốc tới nút này
+        self.path_cost = path_cost
 
 
 class Problem:
@@ -78,15 +74,13 @@ class Domain:
 
     kind: str
     start_state: Any
-    goal: Any  # a goal state, or a predicate state -> bool
+    goal: Any
     get_moves: Callable[[Any], list[Move]]
     apply_move: Callable[[Any, Move], Any]
     state_to_json: Callable[[Any], Any]
-    # (state, parent_state or None, action or None) -> extra per-node fields for the UI
     node_extras: Callable[[Any, Any, Move | None], dict[str, Any]]
     solvability: dict[str, Any]
     goal_description: str
     result_fields: dict[str, Any]
-    # Chi phí một hành động (mặc định 1). move_costs chỉ để giao diện hiển thị bảng giá.
     step_cost: Callable[[Any, Move], int] = unit_cost
     move_costs: dict[str, int] = field(default_factory=dict)

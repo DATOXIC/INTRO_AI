@@ -11,8 +11,8 @@ ROOT = Path(__file__).resolve().parent.parent
 PACKAGE = ROOT / "searchviz"
 sys.path.insert(0, str(ROOT / "tools"))
 
-import build_site  # noqa: E402
-from searchviz.web.server import resolve_static  # noqa: E402
+import build_site
+from searchviz.web.server import resolve_static
 
 
 def imported_layers(layer: str) -> set[str]:
@@ -22,7 +22,7 @@ def imported_layers(layer: str) -> set[str]:
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.ImportFrom):
                 module = node.module or ""
-                if node.level == 2:  # from ..core import ...
+                if node.level == 2:
                     found.add(module.split(".")[0])
                 elif node.level == 0 and module.startswith("searchviz."):
                     found.add(module.split(".")[1])

@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tests import trace_cases  # noqa: E402
+from tests import trace_cases
 
 gold = {name: trace_cases.fingerprint(run()) for name, run in trace_cases.cases()}
 (ROOT / "tests" / "golden_traces.json").write_text(json.dumps(dict(sorted(gold.items())), indent=0), encoding="utf-8")

@@ -90,7 +90,7 @@ def UCS(puzzle: Problem) -> list[Any] | None:
             if child.state not in explored and pos == -1:
                 heapq.heappush(frontier, (child.path_cost, next(arrival), child))
             elif pos != -1 and frontier[pos][2].path_cost > child.path_cost:
-                frontier[pos] = (child.path_cost, next(arrival), child)  # REPLACE
+                frontier[pos] = (child.path_cost, next(arrival), child)
                 heapq.heapify(frontier)
     return None
 

@@ -45,15 +45,12 @@ class TestNPuzzleDomain(unittest.TestCase):
         )
 
     def test_solvability_odd_and_even_grids(self) -> None:
-        # 2x2 even grid
         self.assertTrue(is_solvable(((0, 2), (1, 3)), make_goal_board(2)))
         self.assertFalse(is_solvable(((2, 1), (3, 0)), make_goal_board(2)))
 
-        # 3x3 odd grid
         self.assertTrue(is_solvable(((1, 2, 3), (4, 0, 6), (7, 5, 8)), make_goal_board(3)))
         self.assertFalse(is_solvable(((1, 2, 3), (4, 5, 6), (8, 7, 0)), make_goal_board(3)))
 
-        # 4x4 even grid (Sam Loyd's classic unsolvable 14-15 swap)
         goal4 = make_goal_board(4)
         self.assertTrue(
             is_solvable(
@@ -252,7 +249,6 @@ class TestDFS(unittest.TestCase):
         for i, step in enumerate(steps):
             if step["event_type"] != "dequeue":
                 continue
-            # frontier right BEFORE the pop = frontier AFTER the pop + the popped node on top.
             before = steps[i - 1]["frontier_ids"]
             self.assertEqual(before[-1], step["cur_id"])
             self.assertEqual(before[:-1], step["frontier_ids"])
@@ -299,7 +295,6 @@ class TestVacuumWorld(unittest.TestCase):
         self.assertEqual(result_vacuum((0, True, True), "Hút bụi"), (0, False, True))
         self.assertEqual(result_vacuum((1, True, True), "Hút bụi"), (1, True, False))
         self.assertEqual(result_vacuum((0, True, False), "Phải"), (1, True, False))
-        # Bumping into the wall is a legal no-op.
         self.assertEqual(result_vacuum((0, True, False), "Trái"), (0, True, False))
         self.assertEqual(actions_vacuum((0, True, True)), ["Trái", "Phải", "Hút bụi"])
         self.assertTrue(is_all_clean((1, False, False)))
@@ -325,7 +320,6 @@ class TestVacuumWorld(unittest.TestCase):
                         self.assertEqual(res["problem"], "vacuum")
                         last = res["nodes"][res["solution_ids"][-1]]["state"]
                         self.assertEqual(last["dirt"], [False, False])
-                    # BFS is optimal: it needs exactly (#dirty rooms) Suck actions plus at most one move.
                     bfs = search_trace(make_vacuum_domain(start), algorithm="bfs")
                     dirty = int(dirt_a) + int(dirt_b)
                     self.assertGreaterEqual(bfs["summary"]["solution_length"], dirty)
@@ -346,7 +340,6 @@ class TestVacuumWorld(unittest.TestCase):
                 coll = graph["nodes"][step["collision_id"]]
                 self.assertEqual(cand["state"], coll["state"])
 
-        # Tree-search DFS keeps taking the same "Hút bụi" no-op: it never terminates by itself.
         loop = search_trace(
             make_vacuum_domain((0, True, True)), algorithm="dfs", graph_search=False, max_nodes=40
         )
@@ -423,7 +416,6 @@ class TestHTTPServerIntegration(unittest.TestCase):
         self.assertEqual(res["status"], "solved")
         self.assertEqual(res["summary"]["solution_length"], 2)
 
-        # Unsolvable blocked by default
         unsolv = json.dumps({
             "size": 2,
             "start_board": [[2, 1], [3, 0]],
@@ -433,7 +425,6 @@ class TestHTTPServerIntegration(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertEqual(json.loads(raw)["status"], "unsolvable_blocked")
 
-        # Unsolvable with force_run=True runs to failure
         unsolv_force = json.dumps({
             "size": 2,
             "start_board": [[2, 1], [3, 0]],

@@ -16,9 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-# Dòng cấu trúc: không tắt được (bỏ chúng thì chương trình không còn là thuật toán nữa).
 LOCKED_TAGS = frozenset({"def", "while_loop", "for_move", "return_none"})
-# Dòng đứng yên: tiêu đề hàm luôn ở đầu, `return None` luôn ở cuối.
 FIXED_TAGS = frozenset({"def", "return_none"})
 ROOT_BLOCK = "root"
 
@@ -26,10 +24,10 @@ ROOT_BLOCK = "root"
 @dataclass
 class Stmt:
     tag: str
-    code: str  # không thụt lề; độ sâu do vị trí trong cây quyết định
-    kind: str = "simple"  # simple | while | for | if | elif
+    code: str
+    kind: str = "simple"
     body: list["Stmt"] = field(default_factory=list)
-    orelse: "Stmt | None" = None  # nhánh elif nối ngay sau một dòng if
+    orelse: "Stmt | None" = None
 
 
 @dataclass
@@ -109,7 +107,6 @@ def build_program(algorithm: str, graph_search: bool = True, early_goal_test: bo
         ]
         return Program(algorithm, "UCS_nhanh", True, False, body)
 
-    # BFS / DFS: cùng một bộ khung, khác cấu trúc frontier
     is_dfs = algorithm == "dfs"
     name = "DFS" if is_dfs else "BFS"
     make_frontier = "Stack(); push(frontier, root)" if is_dfs else "Queue(); enqueue(frontier, root)"
@@ -144,8 +141,6 @@ def build_program(algorithm: str, graph_search: bool = True, early_goal_test: bo
     body.append(_s("return_none", "return None"))
     return Program(algorithm, name, graph_search, early_goal_test, body)
 
-
-# ── Chỉnh sửa ───────────────────────────────────────────────────────────────
 
 def _blocks(program: Program) -> dict[str, list[Stmt]]:
     """Mọi khối có thể đổi thứ tự: tên khối -> danh sách lệnh con (tham chiếu thật, sửa tại chỗ)."""
@@ -201,10 +196,10 @@ def apply_edits(program: Program, edits: Any) -> tuple[Program, frozenset[str], 
         by_tag = {st.tag: st for st in movable}
         picked: list[Stmt] = []
         for tag in wanted:
-            st = by_tag.pop(tag, None)  # tag lạ hoặc lặp bị bỏ qua
+            st = by_tag.pop(tag, None)
             if st is not None:
                 picked.append(st)
-        picked.extend(st for st in movable if st.tag in by_tag)  # tag còn thiếu: giữ thứ tự cũ
+        picked.extend(st for st in movable if st.tag in by_tag)
         if [s.tag for s in picked] == [s.tag for s in movable]:
             continue
         fixed_tail = [st for st in block if st.tag in FIXED_TAGS]
@@ -233,8 +228,6 @@ def _clone(program: Program) -> Program:
     return Program(program.algorithm, program.name, program.graph_search, program.early_goal_test,
                    [copy(s) for s in program.body])
 
-
-# ── Hiển thị ────────────────────────────────────────────────────────────────
 
 def render_lines(program: Program, disabled: frozenset[str] = frozenset()) -> list[dict[str, Any]]:
     """Các dòng mã giả đánh số, kèm thông tin để giao diện hiện nút tắt / đổi chỗ."""

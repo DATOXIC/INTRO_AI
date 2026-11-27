@@ -1,9 +1,3 @@
-/* ─────────────────────────────────────────────────────────────
-   Nguyên tắc: một sân khấu duy nhất, chỉ làm sáng vùng đang xảy ra,
-   không khung viền lồng nhau, điều khiển gắn ở đáy màn hình.
-   Màu và cỡ chữ đều đi qua biến (:root) để chế độ tối và chế độ
-   trình chiếu chỉ cần đổi biến, không phải viết lại luật.
-   ───────────────────────────────────────────────────────────── */
 :root {
   color-scheme: light;
 
@@ -18,8 +12,8 @@
   --text-secondary: #46536a;
   --text-muted: #5f6e86;
 
-  --indigo: #4f46e5;          /* màu chữ / viền nhấn */
-  --indigo-solid: #4f46e5;    /* màu nền nút, chữ trắng đặt lên trên */
+  --indigo: #4f46e5;
+  --indigo-solid: #4f46e5;
   --indigo-hover: #4338ca;
   --indigo-soft: #eef2ff;
   --indigo-border: #c7d2fe;
@@ -50,7 +44,7 @@
   --dirty-border: #d4a76a;
   --predict-bg: #faf5ff;
   --predict-border: #7c3aed;
-  --svg-bg: #f4f6fb;          /* nền các hình SVG (luôn sáng, kể cả ở chế độ tối) */
+  --svg-bg: #f4f6fb;
   --code-bg: #0f172a;
 
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.03);
@@ -61,7 +55,6 @@
   --radius-md: 12px;
   --radius-lg: 16px;
 
-  /* Cỡ chữ và kích thước chính: chế độ trình chiếu chỉ đổi mấy biến này */
   --fs-body: 15px;
   --fs-small: 13px;
   --fs-tiny: 12px;
@@ -127,7 +120,6 @@
   --shadow-dock: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
-/* Chế độ trình chiếu: chữ và bàn cờ to hơn, bớt các điều khiển phụ */
 body.present {
   --fs-body: 17px;
   --fs-small: 15px;
@@ -168,13 +160,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .app-shell {
   max-width: 1520px;
   margin: 0 auto;
-  padding: 0 24px 112px; /* chừa chỗ cho thanh phát nổi ở đáy */
+  padding: 0 24px 112px;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-/* ───────── Đầu trang (dính ở trên cùng) ───────── */
 .topbar {
   position: sticky;
   top: 0;
@@ -203,7 +194,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .top-divider { width: 1px; height: 24px; background: var(--border-strong); opacity: 0.7; }
 .top-actions .select-input { max-width: 280px; }
 
-/* ───────── Tùy chọn (ẩn mặc định) ───────── */
 .options-panel {
   background: var(--bg-surface);
   border: 1px solid var(--border);
@@ -224,7 +214,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .option-toggle small { display: block; font-size: var(--fs-tiny); color: var(--text-muted); line-height: 1.45; }
 .inline-pair { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-/* Nút chọn dạng viên thuốc */
 .segmented { display: inline-flex; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 10px; padding: 3px; gap: 2px; }
 .seg-btn { border: none; background: transparent; color: var(--text-secondary); padding: 6px 13px; border-radius: 7px; font-size: var(--fs-small); font-weight: 600; cursor: pointer; white-space: nowrap; transition: background-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease; }
 .seg-btn:hover { color: var(--text-primary); }
@@ -249,7 +238,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .toggle-chip input { accent-color: var(--indigo-solid); margin: 0; }
 .toggle-sm { height: 30px; padding: 0 10px; }
 
-/* ───────── Nút bấm ───────── */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 38px; padding: 0 16px; border-radius: 10px; font-size: var(--fs-small); font-weight: 650; cursor: pointer; border: 1px solid transparent; transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.08s ease, box-shadow 0.12s ease; white-space: nowrap; }
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -268,7 +256,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .btn-play { min-width: 124px; height: 42px; border-radius: 12px; font-size: 14px; background: linear-gradient(135deg, var(--indigo-solid), #7c5cf0); }
 .btn-play:hover:not(:disabled) { background: linear-gradient(135deg, var(--indigo-hover), #8b6cf5); }
 
-/* ───────── Cảnh báo ───────── */
 .alert-banner { border-radius: var(--radius-md); padding: 12px 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--rose-border); background: var(--rose-soft); color: var(--rose); }
 .alert-banner.alert-warn { border-color: var(--amber-border); background: var(--amber-soft); color: var(--amber); }
 .alert-banner.alert-success { border-color: var(--emerald-border); background: var(--emerald-soft); color: var(--emerald); }
@@ -276,7 +263,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .alert-content strong { font-size: var(--fs-small); }
 .alert-content span { font-size: var(--fs-tiny); }
 
-/* ───────── Dòng chú thích duy nhất (dính dưới đầu trang) ───────── */
 .caption {
   position: sticky;
   top: 63px;
@@ -290,7 +276,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   border: 1px solid var(--border);
   border-left: 4px solid var(--indigo-solid);
   border-radius: var(--radius-md);
-  /* dải màu nền phía trên che nội dung cuộn qua khe giữa đầu trang và dòng chú thích */
   box-shadow: 0 -10px 0 0 var(--bg-canvas), var(--shadow-sm);
 }
 .caption-text { flex: 1; font-size: var(--fs-caption); font-weight: 550; color: var(--text-primary); line-height: 1.4; }
@@ -304,7 +289,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .pill-rose { background: var(--rose-soft); color: var(--rose); border-color: var(--rose-border); }
 .solvability-chip { font-size: var(--fs-tiny); font-weight: 600; padding: 3px 11px; border-radius: 999px; border: 1px solid transparent; }
 
-/* ───────── Số liệu nhanh (luôn hiện) ───────── */
 .statbar { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
 .kpi-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px 12px; display: flex; flex-direction: column; gap: 0; box-shadow: var(--shadow-sm); min-width: 0; }
 .kpi-label { font-size: var(--fs-tiny); color: var(--text-muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -314,10 +298,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .kpi-emerald { color: var(--emerald); }
 #kpiSolutionBranch { font-size: 16px; line-height: 1.6; }
 
-/* ───────── Bố cục chính ───────── */
 .workspace { display: grid; grid-template-columns: var(--code-col) minmax(0, 1fr); gap: 18px; align-items: start; }
 
-/* Mã giả: khối tối, dính bên trái suốt lúc cuộn (kể cả khi xem cây) */
 .code-col { position: sticky; top: 132px; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 150px); overflow-y: auto; scrollbar-width: thin; padding-right: 2px; }
 .code-head { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-tiny); font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
 
@@ -334,14 +316,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .var-chip { font-family: var(--font-mono); font-size: var(--fs-tiny); padding: 3px 9px; border-radius: 6px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-secondary); }
 .mono-tag { font-size: var(--fs-tiny); color: var(--text-muted); background: var(--bg-subtle); padding: 2px 9px; border-radius: 6px; text-transform: none; letter-spacing: 0; font-weight: 500; }
 
-/* ───────── SÂN KHẤU ───────── */
 .stage-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 
 .stage { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 8px; }
 .stage-block { padding: 12px 14px; border-radius: var(--radius-md); }
 .stage-block + .stage-block { border-top: 1px solid var(--border); border-top-left-radius: 0; border-top-right-radius: 0; }
 
-/* Hiệu ứng "đèn sân khấu": vùng đang xảy ra sáng, phần còn lại mờ đi */
 [data-zone] { transition: opacity 0.2s ease, background-color 0.2s ease; }
 .stage.has-focus [data-zone]:not(.zone-focus) { opacity: 0.5; }
 .stage-block.zone-focus { background: var(--focus-bg); }
@@ -361,7 +341,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .dot-emerald { background: var(--emerald-dot); }
 .dot-rose { background: var(--rose-dot); }
 
-/* Dải thẻ (frontier và explored dùng chung) */
 .queue-strip { display: flex; align-items: stretch; gap: 8px; min-height: 112px; padding: 6px 4px 10px; overflow-x: auto; scrollbar-width: thin; }
 .queue-strip .empty-placeholder { align-self: center; flex: 1; padding: 10px; }
 .queue-strip .node-card { flex: 0 0 auto; min-width: 84px; }
@@ -379,7 +358,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .mini-board-cell.size-4 .mini-cell { width: var(--mini-4); height: var(--mini-4); font-size: calc(var(--mini-4) * 0.56); }
 .mini-cell.blank { background: transparent; border-style: dashed; color: transparent; }
 
-/* Trạng thái nổi bật của thẻ */
 .node-card.card-popped { border: 2px dashed var(--amber-dot); background: var(--amber-soft); cursor: default; animation: popFromHead 0.5s ease-out; }
 .node-card.card-popped .mini-board-cell { opacity: 0.75; }
 .node-card.card-front { border-color: var(--amber-dot); background: var(--amber-soft); }
@@ -396,7 +374,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .fx-dup { animation: shake 0.45s ease-in-out; }
 .fx-arrive { animation: arrive 0.7s ease-out; }
 
-/* ───────── Khối "đang xử lý" ───────── */
 .work-grid { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
 .boards-stage { display: flex; align-items: center; gap: 6px; }
 .board-slot { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px; border-radius: var(--radius-md); }
@@ -426,7 +403,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .puzzle-board-mini .puzzle-tile { width: calc(var(--mini) - 1px); height: calc(var(--mini) - 1px); font-size: calc(var(--mini) * 0.5); border-radius: 5px; box-shadow: none; }
 .puzzle-board-mini.size-4 .puzzle-tile { width: calc(var(--mini-4) - 1px); height: calc(var(--mini-4) - 1px); font-size: calc(var(--mini-4) * 0.5); }
 
-/* Bảng kiểm tra: không viền, chỉ hàng đang có kết quả mới tô màu */
 .checklist { flex: 1; min-width: 240px; display: flex; flex-direction: column; gap: 5px; padding: 6px; border-radius: var(--radius-md); }
 .check-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 10px; font-size: var(--fs-small); border: 1px solid transparent; color: var(--text-muted); transition: background-color 0.15s ease; }
 .check-row code { font-size: var(--fs-tiny); }
@@ -453,7 +429,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .move-chip.done::after { content: "✓"; color: var(--emerald); }
 .move-chip.active { background: var(--indigo-solid); border-color: var(--indigo-solid); color: #fff; box-shadow: 0 0 0 3px var(--indigo-border); }
 
-/* ───────── Chi tiết một nút ───────── */
 .pinned-drawer { padding: 12px 14px; border-radius: var(--radius-md); background: var(--indigo-soft); border: 1px solid var(--indigo-border); }
 .pinned-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .pinned-header strong { font-size: var(--fs-small); color: var(--indigo); }
@@ -463,7 +438,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .pinned-meta { display: flex; flex-wrap: wrap; gap: 6px; }
 .pinned-lineage { font-family: var(--font-mono); font-size: var(--fs-tiny); color: var(--text-secondary); word-break: break-word; }
 
-/* ───────── Phân tích thêm ───────── */
 .analysis-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 14px 18px; }
 .card-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; list-style: none; }
 .card-summary::-webkit-details-marker { display: none; }
@@ -500,7 +474,6 @@ details[open] > .card-summary::before { transform: rotate(90deg); }
 .solution-strip { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
 .solution-strip .node-card { width: 96px; }
 
-/* ───────── Thanh phát nổi ở đáy ───────── */
 .dock { position: fixed; left: 0; right: 0; bottom: 14px; z-index: 30; padding: 0 24px; pointer-events: none; }
 .dock-inner { pointer-events: auto; max-width: 1180px; margin: 0 auto; padding: 10px 14px; display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-dock); }
 .playback-buttons { display: flex; align-items: center; gap: 6px; }
@@ -509,7 +482,6 @@ details[open] > .card-summary::before { transform: rotate(90deg); }
 .step-counter { font-family: var(--font-mono); font-size: var(--fs-small); font-weight: 600; color: var(--text-secondary); min-width: 78px; text-align: right; }
 .dock-extras { display: flex; align-items: center; gap: 8px; padding-left: 14px; border-left: 1px solid var(--border); }
 
-/* ───────── Hộp thoại ───────── */
 .modal-backdrop { position: fixed; inset: 0; background: rgba(8, 12, 24, 0.55); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
 .modal-dialog { width: 100%; max-width: 500px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3); overflow: hidden; }
 .modal-header, .modal-footer { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -527,7 +499,6 @@ details[open] > .card-summary::before { transform: rotate(90deg); }
 .editor-status.ok { background: var(--emerald-soft); color: var(--emerald); border: 1px solid var(--emerald-border); }
 .editor-status.err { background: var(--rose-soft); color: var(--rose); border: 1px solid var(--rose-border); }
 
-/* ───────── Vacuum Robot ───────── */
 .puzzle-board.vac-board { gap: 6px; }
 .room { width: 100px; height: 100px; border-radius: 12px; border: 2px solid var(--border-strong); background: var(--bg-surface); display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 7px 4px; transition: box-shadow 0.15s ease, background-color 0.15s ease; }
 .room-name { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -546,7 +517,6 @@ details[open] > .card-summary::before { transform: rotate(90deg); }
 .mini-cell.vac-cell.dirty { background: var(--dirty-bg); border-color: var(--dirty-border); }
 .goal-text { font-size: var(--fs-tiny); font-weight: 600; color: var(--emerald); background: var(--emerald-soft); border: 1px solid var(--emerald-border); border-radius: var(--radius-sm); padding: 4px 8px; max-width: 170px; line-height: 1.3; }
 
-/* ───────── Chế độ so sánh hai thuật toán ───────── */
 :root { --c-bfs: #4f46e5; --c-dfs: #0d9488; }
 :root[data-theme="dark"] { --c-bfs: #818cf8; --c-dfs: #2dd4bf; }
 .dot.lg-bfs { background: var(--c-bfs); }
@@ -559,7 +529,6 @@ details[open] > .card-summary::before { transform: rotate(90deg); }
 .app-shell.compare-on #algoSelector { opacity: 0.4; pointer-events: none; }
 .app-shell.compare-on #stepModeSelector { display: none; }
 
-/* Thứ tự hiển thị: hai bên (đang bước) → biểu đồ → bảng kết quả & nhận xét */
 .cmp-sides { order: 1; }
 .cmp-charts { order: 2; }
 .cmp-top { order: 3; }
@@ -597,7 +566,6 @@ details[open] > .card-summary::before { transform: rotate(90deg); }
 .cmp-solution { padding: 8px 10px; border-radius: var(--radius-md); background: var(--emerald-soft); border: 1px solid var(--emerald-border); color: var(--emerald); font-size: var(--fs-small); font-weight: 600; word-break: break-word; }
 .cmp-side .queue-strip { min-height: 100px; }
 
-/* ───────── Cây tìm kiếm + không gian trạng thái ───────── */
 .viz-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
 .viz-row.has-graph { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
 .viz-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 14px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
@@ -613,7 +581,6 @@ details[open] > .card-summary::before { transform: rotate(90deg); }
 .cmp-tree { width: 100%; height: 230px; display: block; background: var(--svg-bg); border: 1px solid var(--border); border-radius: var(--radius-md); }
 .cmp-graph { width: 100%; height: auto; max-height: 240px; display: block; background: var(--svg-bg); border-radius: var(--radius-md); }
 
-/* ───────── Chế độ Dự đoán ───────── */
 .predict-score { font-size: var(--fs-tiny); font-weight: 700; color: var(--indigo); background: var(--indigo-soft); border: 1px solid var(--indigo-border); border-radius: 999px; padding: 3px 11px; white-space: nowrap; }
 .predict-actions { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 .caption.predict { border-left-color: var(--predict-border); background: var(--predict-bg); }
@@ -629,13 +596,11 @@ details[open] > .card-summary::before { transform: rotate(90deg); }
 .app-shell.compare-on #predictScore,
 .app-shell.compare-on #predictActions { display: none; }
 
-/* Thanh phát nằm ngoài .app-shell nên cần luật theo <body> */
 body.compare-on #stepModeSelector,
 body.compare-on #predictBtn,
 body.predict-on #stepModeSelector { display: none; }
 body.compare-on #algoSelector { opacity: 0.4; pointer-events: none; }
 
-/* ───────── UCS: chi phí g, nút cũ, bảng giá ───────── */
 .dot-slate { background: #94a3b8; }
 .node-card.card-stale { opacity: 0.55; border-style: dashed; border-color: var(--border-strong); background: var(--bg-subtle); }
 .node-card.card-stale .node-card-top span:first-child { text-decoration: line-through; }
@@ -649,14 +614,12 @@ body.compare-on #algoSelector { opacity: 0.4; pointer-events: none; }
 .cmp-table th.cmp-ucs_fast { color: #9333ea; }
 :root[data-theme="dark"] .cmp-table th.cmp-ucs_fast { color: #c084fc; }
 
-/* ───────── So sánh: chọn hai thuật toán ───────── */
 .cmp-pickers { order: 0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 4px 2px; }
 .cmp-picker { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-tiny); font-weight: 700; color: var(--text-secondary); }
 .cmp-vs { font-size: var(--fs-tiny); font-weight: 700; color: var(--text-muted); }
 .cmp-legend-item { display: inline-flex; align-items: center; gap: 4px; }
 .cmp-legend-item i { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
 
-/* ───────── Vacuum nhiều phòng ───────── */
 .puzzle-board.vac-board.dense { gap: 4px; }
 .vac-board.dense .room { width: 62px; height: 74px; padding: 4px 2px; border-radius: 8px; }
 .vac-board.dense .room-name { font-size: 9px; }
@@ -667,12 +630,10 @@ body.compare-on #algoSelector { opacity: 0.4; pointer-events: none; }
 .mini-board-cell.vac.dense .mini-cell.vac-cell { width: 31px; height: 22px; font-size: 9px; letter-spacing: -1px; }
 .mini-cell.vac-cell.rooms-cur { outline: 1px solid var(--indigo); }
 
-/* Tùy chọn Vacuum: dòng riêng, tự xuống hàng khi nhiều phòng */
 .option-block.vac-only { grid-column: 1 / -1; }
 .option-note-block { grid-column: 1 / -1; }
 #vacRoomsSelector, #vacRobotSelector { flex-wrap: wrap; max-width: 100%; }
 
-/* ───────── Chế độ trình chiếu: bớt điều khiển phụ ───────── */
 body.present .brand-sub,
 body.present #optionsBtn,
 body.present #optionsPanel,
@@ -684,7 +645,6 @@ body.present .app-shell { max-width: 1700px; }
 body.present .code-viewer { max-height: calc(100vh - 300px); }
 body.present .seg-btn, body.present .btn { font-size: var(--fs-small); }
 
-/* ───────── Responsive ───────── */
 @media (max-width: 1280px) {
   :root { --code-col: 490px; --fs-code: 12px; }
   body.present { --code-col: 560px; --fs-code: 14px; }
@@ -728,7 +688,6 @@ body.present .seg-btn, body.present .btn { font-size: var(--fs-small); }
 }
 
 
-/* ───────── Bộ gỡ lỗi: điểm dừng, theo dõi, quy luật ───────── */
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .line-num { cursor: pointer; border-radius: 4px; transition: background-color 0.1s ease; }
 .line-num:hover { background: rgba(244, 63, 94, 0.35); color: #fff; }
@@ -781,7 +740,6 @@ body.present .seg-btn, body.present .btn { font-size: var(--fs-small); }
 body.present .debug-box { display: none; }
 .app-shell.compare-on .debug-box { display: none; }
 
-/* ───────── Nếu bỏ / đổi chỗ dòng này thì sao? ───────── */
 .code-line { position: relative; }
 .line-tools { display: inline-flex; gap: 2px; margin-left: 10px; opacity: 0; transition: opacity 0.12s ease; flex: 0 0 auto; align-self: center; }
 .code-line:hover .line-tools, .code-line:focus-within .line-tools, .code-line.is-disabled .line-tools { opacity: 1; }

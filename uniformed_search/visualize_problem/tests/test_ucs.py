@@ -41,7 +41,6 @@ from searchviz.problems.vacuum import (
 )
 from searchviz.web.api import handle
 
-# Đồ thị nhỏ để ép xảy ra REPLACE: S→A tốn 5 nhưng S→B→A chỉ tốn 1+1.
 TOY_GRAPH: dict[str, dict[str, int]] = {
     "S": {"A": 5, "B": 1},
     "B": {"A": 1},
@@ -126,7 +125,6 @@ class TestActionCosts(unittest.TestCase):
                     self.assertEqual(node["step_cost"], NPUZZLE_MOVE_COSTS[node["action"]])
 
     def test_bfs_reports_the_real_cost_of_its_shortest_path(self) -> None:
-        # BFS ít bước nhất (2 bước) nhưng đắt hơn đường UCS tìm được (3 bước).
         bfs = search_trace(toy_domain(), algorithm="bfs")
         ucs = search_trace(toy_domain(), algorithm="ucs")
         self.assertEqual(bfs["summary"]["solution_length"], 2)
@@ -143,7 +141,6 @@ class TestUCSTrace(unittest.TestCase):
         self.assertEqual(res["summary"]["replaced"], 1)
         evs = events(res)
         self.assertEqual(evs.count("replace"), 1)
-        # thứ tự dòng: dup_frontier → better → replace
         i = evs.index("dup_frontier")
         self.assertEqual(evs[i : i + 3], ["dup_frontier", "better", "replace"])
 
@@ -154,7 +151,6 @@ class TestUCSTrace(unittest.TestCase):
         self.assertEqual(old["superseded_by"], new["id"])
         self.assertEqual(old["superseded_step"], replace_step["index"])
         self.assertEqual(new["replaces"], old["id"])
-        # sau bước replace, nút cũ không còn trong frontier
         self.assertNotIn(old["id"], replace_step["frontier_ids"])
         self.assertIn(new["id"], replace_step["frontier_ids"])
 
@@ -188,14 +184,12 @@ class TestUCSTrace(unittest.TestCase):
         enqueue_steps = [s for s in res["steps"] if s["event_type"] == "enqueue" and s["collision_id"] is not None]
         self.assertEqual(len(enqueue_steps), 1)
         old = res["nodes"][enqueue_steps[0]["collision_id"]]
-        # nút cũ vẫn nằm trong frontier cho tới khi bị pop và bỏ qua
         self.assertIn(old["id"], enqueue_steps[0]["frontier_ids"])
         stale_step = res["steps"][evs.index("skip_stale")]
         self.assertEqual(stale_step["cur_id"], old["id"])
         self.assertEqual(old["discarded_step"], stale_step["index"])
         self.assertIsNone(old["expanded_step"])
         self.assertNotIn(old["id"], stale_step["frontier_ids"])
-        # nút cũ không được mở rộng nên không vào explored
         self.assertNotIn(old["id"], res["steps"][-1]["explored_ids"])
 
     def test_both_versions_share_the_same_expansion_order_without_stale_nodes(self) -> None:
@@ -301,9 +295,8 @@ class TestVacuumRooms(unittest.TestCase):
         state = (1, True, False, True, True)
         self.assertEqual(result_vacuum(state, "Phải"), (2, True, False, True, True))
         self.assertEqual(result_vacuum(state, "Trái"), (0, True, False, True, True))
-        self.assertEqual(result_vacuum(state, "Hút bụi"), (1, True, False, True, True))  # phòng sạch: không đổi
+        self.assertEqual(result_vacuum(state, "Hút bụi"), (1, True, False, True, True))
         self.assertEqual(result_vacuum((2, True, False, True, True), "Hút bụi"), (2, True, False, False, True))
-        # chạm tường là nước đi hợp lệ nhưng không đổi trạng thái
         self.assertEqual(result_vacuum((0, True, True, True, True), "Trái"), (0, True, True, True, True))
         self.assertEqual(result_vacuum((3, True, True, True, True), "Phải"), (3, True, True, True, True))
         self.assertEqual(actions_vacuum(state), ["Trái", "Phải", "Hút bụi"])
@@ -329,16 +322,13 @@ class TestVacuumRooms(unittest.TestCase):
                             self.assertGreaterEqual(res["summary"]["solution_cost"], expected)
 
     def test_known_optimal_costs(self) -> None:
-        # 3 phòng, robot ở A, cả ba bẩn: hút, phải, hút, phải, hút = 3×1 + 2×2 = 7
         res = search_trace(make_vacuum_domain((0, True, True, True)), algorithm="ucs")
         self.assertEqual(res["summary"]["solution_cost"], 7)
         self.assertEqual(res["summary"]["solution_length"], 5)
-        # chỉ phòng cuối bẩn: đi qua 2 phòng sạch rồi hút = 2×2 + 1 = 5
         res = search_trace(make_vacuum_domain((0, False, False, True)), algorithm="ucs_fast")
         self.assertEqual(res["summary"]["solution_cost"], 5)
 
     def test_robot_in_the_middle_prefers_the_cheaper_side_first(self) -> None:
-        # Robot ở B (giữa), cả ba phòng bẩn: B → A → B → C (4 bước di chuyển ... ) tối ưu = 3 hút + 3 di chuyển = 9
         res = search_trace(make_vacuum_domain((1, True, True, True)), algorithm="ucs")
         self.assertEqual(res["summary"]["solution_cost"], 9)
 
@@ -395,7 +385,7 @@ class TestApi(unittest.TestCase):
         )
         self.assertEqual(status, 200)
         self.assertEqual(res["summary"]["solution_length"], 2)
-        self.assertEqual(res["summary"]["solution_cost"], 3)  # Xuống (1) + Phải (2)
+        self.assertEqual(res["summary"]["solution_cost"], 3)
         self.assertEqual(res["move_costs"]["Phải"], 2)
 
     def test_bad_vacuum_requests_return_400(self) -> None:

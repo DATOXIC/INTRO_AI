@@ -1,16 +1,6 @@
-/* Chạy mã Python của bài ngay trong trình duyệt (Pyodide) để trang chạy được trên
- * GitHub Pages mà không cần máy chủ. Chạy trong Web Worker nên giao diện không bị đơ
- * khi thuật toán tính toán lâu.
- *
- * Giao thức: main -> worker  {id, method, path, payload}
- *            worker -> main  {id, status, body}  hoặc  {id, fatal}
- *            worker -> main  {progress: "..."}   (thông báo tiến độ tải)
- */
 const PYODIDE_VERSION = "0.26.4";
 const PYODIDE_BASE = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 
-// Package Python `searchviz` nằm trong thư mục py/ cạnh trang. py/manifest.json liệt kê từng file
-// (tools/build_site.py tự sinh), nên thêm module mới không phải sửa ở đây.
 const PY_DIR = "py/";
 
 let ready = null;
@@ -26,7 +16,7 @@ async function boot() {
     const resp = await fetch(PY_DIR + name, { cache: "no-store" });
     if (!resp.ok) throw new Error(`Không tải được ${name} (HTTP ${resp.status})`);
     const dest = "/home/pyodide/" + name;
-    pyodide.FS.mkdirTree(dest.slice(0, dest.lastIndexOf("/"))); // tạo thư mục con (searchviz/core/...)
+    pyodide.FS.mkdirTree(dest.slice(0, dest.lastIndexOf("/")));
     pyodide.FS.writeFile(dest, await resp.text());
   }
   pyodide.runPython(`
@@ -41,7 +31,6 @@ def _call(method, path, payload_json):
   return pyodide;
 }
 
-// Lỗi của Pyodide/Emscripten đôi khi không phải đối tượng Error (không có .message): in được cả trường hợp đó.
 function describeError(err) {
   if (err && typeof err.message === "string" && err.message) return err.message;
   try {
@@ -62,7 +51,7 @@ onmessage = async (event) => {
     const [status, body] = JSON.parse(raw);
     postMessage({ id, status, body });
   } catch (err) {
-    ready = null; // cho phép thử lại ở lần gọi sau
+    ready = null;
     postMessage({ id, fatal: describeError(err) });
   }
 };

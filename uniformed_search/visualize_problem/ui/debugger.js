@@ -1,18 +1,9 @@
-/* Bộ gỡ lỗi cho trình xem thuật toán: điểm dừng (breakpoint), điều kiện dừng, chạy tới dòng,
- * bảng theo dõi biến và các "quy luật" của thuật toán.
- *
- * Toàn bộ các bước đã được ghi sẵn khi chạy, nên mọi thứ ở đây chỉ là duyệt qua danh sách bước:
- * không gọi lại Python. app.js cung cấp window.SearchViz (đọc trace, nhảy tới bước) và gọi
- * onTrace / afterRender / pausesAt / stopped ở các thời điểm tương ứng.
- */
 (() => {
   "use strict";
 
   const $ = (id) => document.getElementById(id);
   const host = () => window.SearchViz;
 
-  // ── Điều kiện dừng ─────────────────────────────────────────────────────────
-  // edge = true: chỉ dừng ở bước điều kiện VỪA trở thành đúng (không dừng lặp lại ở mọi bước sau đó).
   const nodeOf = (t, id) => (id === null || id === undefined ? null : t.nodes[id]);
   const CONDITIONS = {
     frontier_gt: {
@@ -67,13 +58,12 @@
     },
   };
 
-  // ── Trạng thái ─────────────────────────────────────────────────────────────
   const state = {
-    tags: new Set(),      // điểm dừng theo dòng, lưu theo tag nên còn hiệu lực khi đổi tùy chọn
-    conds: [],            // [{type, value, on}]
-    hits: new Map(),      // chỉ số bước -> lý do dừng đầu tiên
+    tags: new Set(),
+    conds: [],
+    hits: new Map(),
     invariants: [],
-    status: null,         // {step, text, kind}
+    status: null,
   };
 
   const trace = () => {
@@ -85,7 +75,6 @@
     return t.source_lines.find((l) => l.tag === tag) || null;
   }
 
-  // ── Tính các bước sẽ dừng ──────────────────────────────────────────────────
   function stopReason(t, i) {
     const s = t.steps[i];
     const prev = i > 0 ? t.steps[i - 1] : null;
@@ -113,7 +102,6 @@
     }
   }
 
-  // ── Quy luật của thuật toán (kiểm trên toàn bộ trace, một lần) ─────────────
   function stateKey(t, id) {
     return JSON.stringify(t.nodes[id].state);
   }
@@ -183,7 +171,6 @@
         check: (prevFrontier, cur, mem, stepIdx) => {
           mem.seen = mem.seen || new Map();
           const key = stateKey(t, cur);
-          // UCS tối ưu có thể pop nút cũ rồi bỏ qua: chỉ tính khi nút thật sự được mở rộng
           const next = t.steps[stepIdx + 1];
           if (next && (next.event_type === "skip_stale")) return true;
           if (mem.seen.has(key)) {
@@ -214,7 +201,6 @@
     return out;
   }
 
-  // ── Giao diện ──────────────────────────────────────────────────────────────
   function toast(text, kind = "info") {
     const t = trace();
     state.status = { step: t ? host().getStep() : -1, text, kind };
@@ -414,7 +400,6 @@
     toolbarState();
   }
 
-  // ── Điều hướng ─────────────────────────────────────────────────────────────
   function runToBreakpoint(dir) {
     const t = trace();
     if (!t) return;
@@ -465,7 +450,6 @@
     toast(`Phía sau không còn lần nào chạy tới dòng ${ln ? ln.line : ""}.`, "info");
   }
 
-  // ── Móc nối với app.js ─────────────────────────────────────────────────────
   window.SearchDebugger = {
     hasBreakpoint: (tag) => state.tags.has(tag),
     onTrace() {
