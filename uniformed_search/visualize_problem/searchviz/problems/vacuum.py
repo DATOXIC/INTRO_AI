@@ -196,4 +196,5 @@ def solve(payload: dict[str, Any], options: SolveOptions) -> dict[str, Any]:
         graph_search=options.graph_search,
         early_goal_test=options.early_goal_test,
         max_nodes=options.max_nodes,
+        edits=options.edits,
     )

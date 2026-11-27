@@ -433,7 +433,7 @@ def solve(payload: dict[str, Any], options: SolveOptions) -> dict[str, Any]:
                 "max_nodes": options.max_nodes,
             },
             "solvability": solvability,
-            "source_lines": get_source_lines(options.algorithm, options.graph_search, options.early_goal_test),
+            "source_lines": get_source_lines(options.algorithm, options.graph_search, options.early_goal_test, options.edits),
             "nodes": [],
             "steps": [],
             "solution_ids": None,
@@ -446,6 +446,7 @@ def solve(payload: dict[str, Any], options: SolveOptions) -> dict[str, Any]:
         graph_search=options.graph_search,
         early_goal_test=options.early_goal_test,
         max_nodes=options.max_nodes,
+        edits=options.edits,
     )
 
 

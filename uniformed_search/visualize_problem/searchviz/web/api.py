@@ -41,6 +41,7 @@ def _solve(payload: dict[str, Any]) -> dict[str, Any]:
         early_goal_test=parse_bool(payload.get("early_goal_test"), "early_goal_test", True),
         max_nodes=parse_int(payload.get("max_nodes"), "max_nodes", 300, 1, 3000),
         force_run=parse_bool(payload.get("force_run"), "force_run", False),
+        edits=payload.get("program"),
     )
     return PROBLEMS[problem_kind].solve(payload, options)
 

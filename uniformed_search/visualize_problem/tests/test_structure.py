@@ -44,7 +44,7 @@ class StaticServingTests(unittest.TestCase):
         self.assertEqual(resolve_static("/")[0].name, "index.html")
 
     def test_rejects_traversal_and_unknown_files(self) -> None:
-        for path in ("/../README.md", "/..\\README.md", "/searchviz/core/types.py", "/nope.js", "/.env"):
+        for path in ("/../README.md", "/..\\README.md", "/searchviz/core/models.py", "/nope.js", "/.env"):
             self.assertIsNone(resolve_static(path), path)
 
 

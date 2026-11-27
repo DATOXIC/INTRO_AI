@@ -36,6 +36,7 @@
     goal_late: { text: "TỚI ĐÍCH", cls: "pill-emerald" },
     limit_reached: { text: "CHẠM GIỚI HẠN", cls: "pill-amber" },
     failure: { text: "VÔ NGHIỆM", cls: "pill-rose" },
+    program_error: { text: "LỖI CHƯƠNG TRÌNH", cls: "pill-rose" },
   };
 
   // DFS dùng ngăn xếp, UCS dùng hàng đợi ưu tiên: đổi từ ngữ của ba sự kiện liên quan tới frontier.
@@ -99,6 +100,21 @@
       draftStart: null,
       draftTarget: null,
     },
+  };
+
+  // Cầu nối cho các module bổ trợ (debugger.js, whatif.js): đọc trace, nhảy tới bước.
+  window.SearchViz = {
+    getTrace: () => state.trace,
+    getStep: () => state.currentStep,
+    goTo(idx) {
+      stopPlayback();
+      state.currentStep = idx;
+      renderStep();
+    },
+    predictActive: () => state.predict.enabled,
+    rerun: () => runSearch(false),
+    // Chạy lại đúng cấu hình hiện tại nhưng KHÔNG có chỉnh sửa, để so với bản đã sửa
+    solveOriginal: () => apiJson("/api/solve", { method: "POST", body: JSON.stringify(buildPayload(true)) }),
   };
 
   const els = {
@@ -373,7 +389,16 @@
         stopPlayback();
         return;
       }
-      if (!moveStep(1, state.stepMode === "macro")) stopPlayback();
+      if (!moveStep(1, state.stepMode === "macro")) {
+        stopPlayback();
+        return;
+      }
+      // Điểm dừng: bước vừa tới thỏa một điều kiện thì tạm dừng phát
+      const why = window.SearchDebugger && window.SearchDebugger.pausesAt(state.currentStep);
+      if (why) {
+        stopPlayback();
+        window.SearchDebugger.stopped(state.currentStep, why);
+      }
     }, interval);
   }
 
@@ -537,24 +562,59 @@
     }
   }
 
+  // Nút "nếu bỏ / đổi chỗ dòng này thì sao?" (whatif.js lo phần xử lý khi bấm)
+  function buildLineTools(item) {
+    if (item.locked && !item.can_up && !item.can_down) return null;
+    const box = document.createElement("span");
+    box.className = "line-tools";
+    const add = (action, text, title) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `line-tool tool-${action}`;
+      b.dataset.action = action;
+      b.textContent = text;
+      b.title = title;
+      b.setAttribute("aria-label", title);
+      box.appendChild(b);
+    };
+    if (!item.locked) {
+      add("toggle", item.disabled ? "↺" : "⊘", item.disabled ? "Bật lại dòng này" : "Tắt dòng này rồi chạy lại");
+    }
+    if (item.unit && item.can_up) add("up", "▲", "Đưa dòng này lên trước dòng kế bên rồi chạy lại");
+    if (item.unit && item.can_down) add("down", "▼", "Đưa dòng này xuống sau dòng kế bên rồi chạy lại");
+    return box.childElementCount ? box : null;
+  }
+
   function renderCodePanel(sourceLines, activeLine, eventType, localVars) {
     els.codeLinesContainer.innerHTML = "";
     const activeCls =
-      ["skip_explored", "skip_frontier", "not_better", "skip_stale", "failure"].includes(eventType)
+      ["skip_explored", "skip_frontier", "not_better", "skip_stale", "failure", "program_error"].includes(eventType)
         ? "active-rose"
         : eventType === "goal_early" || eventType === "goal_late" || eventType === "goal_init"
         ? "active-emerald"
         : "active";
 
+    const dbg = window.SearchDebugger;
     for (const item of sourceLines) {
       const row = document.createElement("div");
-      row.className = "code-line" + (item.line === activeLine ? ` ${activeCls}` : "");
+      row.className =
+        "code-line" +
+        (item.line === activeLine ? ` ${activeCls}` : "") +
+        (dbg && dbg.hasBreakpoint(item.tag) ? " has-bp" : "") +
+        (item.disabled ? " is-disabled" : "");
+      row.dataset.tag = item.tag;
+      if (item.block !== undefined && item.block !== null) row.dataset.block = item.block;
       const num = document.createElement("span");
       num.className = "line-num";
       num.textContent = String(item.line);
+      num.title = "Bấm để đặt / bỏ điểm dừng";
       const code = document.createElement("span");
+      code.className = "line-code";
+      code.title = "Bấm để chạy tới dòng này";
       code.textContent = item.code;
       row.append(num, code);
+      const tools = buildLineTools(item);
+      if (tools) row.appendChild(tools);
       els.codeLinesContainer.appendChild(row);
     }
 
@@ -1759,6 +1819,7 @@
       els.vacGraphSvg.innerHTML = "";
       renderCostLegend(null);
       renderSearchTree();
+      if (window.SearchDebugger) window.SearchDebugger.afterRender();
       return;
     }
 
@@ -1833,6 +1894,7 @@
     if (els.analysisCard.open) renderMemoryChart();
     renderPinnedNode();
     renderPredictPrompt();
+    if (window.SearchDebugger) window.SearchDebugger.afterRender();
   }
 
   async function runSearch(forceRun = false) {
@@ -1845,6 +1907,8 @@
 
     try {
       const payload = buildPayload(forceRun);
+      const edits = window.SearchWhatIf && window.SearchWhatIf.getEdits();
+      if (edits) payload.program = edits;
       const algoName = ALGO_LABELS[state.algorithm].name;
       const data = await apiJson("/api/solve", {
         method: "POST",
@@ -1855,6 +1919,7 @@
       state.currentStep = 0;
       state.treeAutoFit = true;
       resetPredictQuestions();
+      if (window.SearchDebugger) window.SearchDebugger.onTrace();
 
       if (data.status === "unsolvable_blocked") {
         els.solvabilityChip.textContent = "Vô nghiệm ✕";
@@ -1876,7 +1941,21 @@
         return;
       }
 
-      if (data.status === "limit_reached") {
+      if (data.status === "program_error") {
+        showAlert("", "Chương trình đã sửa không chạy được", data.error.message);
+      } else if (data.program && data.status === "limit_reached") {
+        showAlert(
+          "warn",
+          `Bản đã sửa không dừng được: chạm giới hạn ${payload.max_nodes} nút mở rộng.`,
+          "Thường là do thiếu một dòng chặn lặp (explored) hoặc dòng kiểm tra đích. Bước tới để xem nó lặp lại ở đâu."
+        );
+      } else if (data.program && data.status === "failure") {
+        showAlert(
+          "warn",
+          "Bản đã sửa kết thúc mà không tìm thấy đích.",
+          "Frontier cạn vì một dòng bạn đổi đã làm mất nút con. So với bản gốc ở bảng bên mã giả."
+        );
+      } else if (data.status === "limit_reached") {
         showAlert(
           "warn",
           `${algoName} đã dừng ở giới hạn an toàn ${payload.max_nodes} nút mở rộng.`,
@@ -1901,6 +1980,7 @@
       renderSolutionStrip();
       renderStep();
       if (els.analysisCard.open) renderMemoryChart();
+      if (window.SearchWhatIf) window.SearchWhatIf.onTrace(data);
     } catch (err) {
       showAlert("", "Không thể chạy thuật toán", err.message);
     } finally {
@@ -2944,6 +3024,7 @@
       const btn = e.target.closest(".seg-btn");
       if (!btn || btn.dataset.algo === state.algorithm) return;
       state.algorithm = btn.dataset.algo;
+      if (window.SearchWhatIf) window.SearchWhatIf.reset();
       updateAlgoLabels();
       runSearch(false);
     });
@@ -2977,8 +3058,14 @@
 
     els.shuffleBtn.addEventListener("click", doShuffle);
     els.runBtn.addEventListener("click", () => runSearch(false));
-    els.graphSearchToggle.addEventListener("change", () => runSearch(false));
-    els.earlyGoalToggle.addEventListener("change", () => runSearch(false));
+    els.graphSearchToggle.addEventListener("change", () => {
+      if (window.SearchWhatIf) window.SearchWhatIf.reset();
+      runSearch(false);
+    });
+    els.earlyGoalToggle.addEventListener("change", () => {
+      if (window.SearchWhatIf) window.SearchWhatIf.reset();
+      runSearch(false);
+    });
 
     els.firstBtn.addEventListener("click", () => {
       stopPlayback();

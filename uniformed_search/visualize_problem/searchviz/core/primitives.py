@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .types import Move, Node, Problem
+from .models import Move, Node, Problem
 
 
 # ── Frontier data structures ────────────────────────────────────────────────

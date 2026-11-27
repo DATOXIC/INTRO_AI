@@ -17,7 +17,7 @@ from .primitives import (
     push,
     solution,
 )
-from .types import Node, Problem, is_goal
+from .models import Node, Problem, is_goal
 
 
 def BFS(puzzle: Problem) -> list[Any] | None:

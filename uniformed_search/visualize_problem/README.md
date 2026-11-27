@@ -28,6 +28,9 @@ Chạy test (từ thư mục này):
 python -m unittest discover -s tests -t .
 ```
 
+`tests/test_golden_traces.py` lưu dấu vân tay của 300 lần chạy: sửa bộ ghi vết mà làm đổi dù một bước, test báo ngay
+ca nào đổi. Nếu chủ ý đổi, chạy `python tests/update_golden.py` rồi xem lại diff.
+
 Trang tự nhận biết: có máy chủ thì gọi API, không có thì chạy chính package `searchviz`
 trong trình duyệt bằng Pyodide (lần đầu mở mất vài giây để tải).
 
@@ -44,11 +47,14 @@ trong trình duyệt bằng Pyodide (lần đầu mở mất vài giây để t�
 visualize_problem/
 ├── searchviz/              package Python
 │   ├── core/               lõi thuật toán, không biết bài toán cụ thể
-│   │   ├── types.py          Node, Problem, Domain, hằng số
+│   │   ├── models.py         Node, Problem, Domain, hằng số
 │   │   ├── primitives.py     Queue/Stack, child_node, solution
 │   │   ├── algorithms.py     BFS, DFS, UCS, UCS_fast (bản chạy thuần)
-│   │   ├── pseudocode.py     mã giả hiển thị, mỗi dòng có tag
-│   │   └── tracing.py        search_trace: ghi vết từng dòng thành JSON
+│   │   ├── program.py        mã giả dưới dạng cây lệnh; tắt dòng, đổi chỗ dòng
+│   │   ├── engine.py         trình thực thi cây lệnh, ghi từng dòng đã chạy
+│   │   ├── recorder.py       ghi nút/bước, gói kết quả JSON
+│   │   ├── pseudocode.py     các dòng mã giả để hiển thị
+│   │   └── tracing.py        search_trace: điểm vào duy nhất
 │   ├── problems/           định nghĩa từng bài toán
 │   │   ├── base.py           SolveOptions + hàm đọc tham số
 │   │   ├── npuzzle.py        n-Puzzle 2×2 / 3×3 / 4×4
@@ -56,9 +62,11 @@ visualize_problem/
 │   └── web/                lớp giao tiếp
 │       ├── api.py            handle(method, path, payload), thuần Python
 │       └── server.py         máy chủ HTTP cục bộ (mỏng, gọi api.handle)
-├── ui/                     giao diện: index.html, styles.css, app.js, theme.js,
+├── ui/                     giao diện: index.html, styles.css, app.js (trình xem chính),
+│                           debugger.js (điểm dừng), whatif.js (tắt/đổi chỗ dòng), theme.js,
 │                           pyodide_worker.js (chạy Python trong trình duyệt)
-├── tests/                  test_bfs_core, test_ucs, test_structure
+├── tests/                  test_bfs_core, test_ucs, test_program_edits, test_golden_traces,
+│                           test_structure
 ├── tools/build_site.py     đóng gói dist/ cho GitHub Pages
 └── run.py                  chạy cục bộ
 ```
@@ -80,10 +88,27 @@ với Python qua `/api/*`.
 ## Thêm thuật toán mới
 
 Thuật toán cùng họ (chỉ đổi cấu trúc frontier) thêm trong `searchviz/core` giống DFS:
-bản chạy thuần ở `algorithms.py`, mã giả ở `pseudocode.py`, nhánh ghi vết ở `tracing.py`, tên trong
-`ALGORITHMS` (`types.py`). UCS là ví dụ cho thuật toán cần thêm thông tin: `Domain.step_cost` cho chi
-phí hành động, trace riêng (`_search_trace_ucs`) và các sự kiện mới trong giao diện. Độ sâu giới hạn
+bản chạy thuần ở `algorithms.py`, cây lệnh ở `program.py`, hàm xử lý từng dòng ở `engine.py`, tên trong
+`ALGORITHMS` (`models.py`). UCS là ví dụ cho thuật toán cần thêm thông tin: `Domain.step_cost` cho chi
+phí hành động, các hàm xử lý riêng trong `engine.py` và các sự kiện mới trong giao diện. Độ sâu giới hạn
 (DLS) hay heuristic (A*) cũng cần mở rộng bộ máy và giao diện chứ không chỉ thêm một dòng.
+
+## Gỡ lỗi và "nếu bỏ lệnh này thì sao?"
+
+**Điểm dừng** (`ui/debugger.js`, không gọi lại Python vì mọi bước đã được ghi sẵn):
+- Bấm *số dòng* trong mã giả để đặt / bỏ điểm dừng; bấm *chữ của dòng* để chạy tới dòng đó.
+- Mục "Điểm dừng" thêm điều kiện dừng: frontier dài hơn N, nút ở tầng ≥ N, g ≥ N, chạm nút #k, gặp nút trùng,
+  tìm thấy đích, UCS thay nút / bỏ nút cũ. Điều kiện dừng ở bước nó *vừa trở thành đúng*.
+- Nút "Tới điểm dừng" (F8, Shift+F8 để lùi), "Hết lượt con", dấu đỏ trên thanh trượt cho biết các bước sẽ dừng.
+- Bảng theo dõi hiện frontier, explored, cur_node, child và đổi màu khi giá trị vừa đổi.
+- "Quy luật của thuật toán" kiểm trên toàn bộ vết: BFS pop đầu hàng đợi, UCS pop nút có g nhỏ nhất, mỗi trạng thái mở
+  rộng một lần... Bấm một quy luật bị vi phạm để nhảy tới bước sai.
+
+**Tắt hoặc đổi chỗ dòng** (`ui/whatif.js` + `searchviz/core/program.py`, `engine.py`): rê chuột lên một dòng,
+bấm ⊘ để tắt, ▲ ▼ để đổi chỗ với dòng kế bên cùng khối. Python chạy lại *đúng chương trình đã sửa* rồi so với
+bản gốc. Dòng dùng biến chưa tạo cho ra lỗi chương trình dễ hiểu; vòng lặp vô hạn bị chặn bởi giới hạn an toàn.
+Các dòng `def`, `while`, `for`, `return` không tắt được, `def` và `return None` không đổi chỗ được.
+API: thêm `"program": {"disabled": [tag], "order": {khối: [tag]}}` vào `/api/solve`.
 
 ## Lưu ý về UCS
 

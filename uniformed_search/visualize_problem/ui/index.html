@@ -139,8 +139,44 @@
           <span id="codeTitle">Mã giả BFS</span>
           <span id="modeSummaryTag" class="mono-tag">Graph · Early Goal</span>
         </div>
+        <p id="whatifHint" class="whatif-hint">Rê chuột lên một dòng: <b>⊘</b> tắt dòng, <b>▲ ▼</b> đổi chỗ. Kết quả chạy lại ngay.</p>
         <div id="codeLinesContainer" class="code-viewer" role="region" aria-label="Mã giả"></div>
         <div id="localVarsContainer" class="vars-pills" aria-label="Giá trị biến lúc này"></div>
+
+        <div id="whatifBox" class="whatif-box hidden" role="status" aria-live="polite">
+          <div class="whatif-head">
+            <strong>Bạn đã sửa mã giả</strong>
+            <button type="button" id="whatifResetBtn" class="btn btn-secondary btn-xs">↺ Khôi phục bản gốc</button>
+          </div>
+          <p id="whatifInsight" class="whatif-insight"></p>
+          <div id="whatifDiff" class="whatif-diff"></div>
+        </div>
+
+        <!-- Bộ gỡ lỗi: điểm dừng, theo dõi, quy luật -->
+        <div class="debug-box" id="debugBox">
+          <div class="debug-toolbar" role="toolbar" aria-label="Điểm dừng và bước chạy">
+            <button type="button" id="bpPrevBtn" class="btn btn-secondary btn-xs" title="Lùi tới điểm dừng trước (Shift+F8)">⏮ Dừng trước</button>
+            <button type="button" id="bpNextBtn" class="btn btn-secondary btn-xs" title="Chạy tới điểm dừng kế tiếp (F8)">⏭ Tới điểm dừng</button>
+            <button type="button" id="stepOverBtn" class="btn btn-secondary btn-xs" title="Chạy hết lượt sinh nút con hiện tại, dừng ở lượt kế tiếp">⤵ Hết lượt con</button>
+          </div>
+          <div id="bpStatus" class="bp-status hidden" role="status" aria-live="polite"></div>
+
+          <div id="watchContainer" class="watch-grid" aria-label="Theo dõi giá trị"></div>
+
+          <details id="bpPanel" class="bp-panel">
+            <summary>Điểm dừng <span id="bpCount" class="count-pill pill-neutral">0</span></summary>
+            <div id="bpList" class="bp-list"></div>
+            <form id="bpForm" class="bp-form">
+              <label class="sr-only" for="bpCondType">Dừng khi</label>
+              <select id="bpCondType" class="select-input select-sm"></select>
+              <span id="bpCondValueWrap"><input id="bpCondValue" type="number" min="0" class="num-input" aria-label="Giá trị" /></span>
+              <button type="submit" class="btn btn-secondary btn-xs">+ Thêm</button>
+              <button type="button" id="bpClearBtn" class="btn btn-xs bp-clear">Xóa hết</button>
+            </form>
+          </details>
+
+          <div id="invariantRow" class="invariants" aria-label="Quy luật của thuật toán"></div>
+        </div>
       </section>
 
       <!-- Phải: SÂN KHẤU duy nhất -->
@@ -373,7 +409,10 @@
         <button type="button" id="lastBtn" class="btn btn-icon" title="Tới cuối (End)" aria-label="Tới cuối">⏭</button>
       </div>
 
-      <input type="range" id="stepSlider" min="0" max="0" value="0" aria-label="Thanh tiến trình" />
+      <div class="slider-wrap">
+        <input type="range" id="stepSlider" min="0" max="0" value="0" aria-label="Thanh tiến trình" />
+        <div id="bpMarks" class="bp-marks" aria-hidden="true"></div>
+      </div>
       <span id="stepCounter" class="step-counter">0 / 0</span>
 
       <div class="dock-extras">
@@ -432,5 +471,7 @@
   </div>
 
   <script src="app.js"></script>
+  <script src="debugger.js"></script>
+  <script src="whatif.js"></script>
 </body>
 </html>

@@ -1,13 +1,17 @@
 """Lõi thuật toán: chạy được trên mọi bài toán, không biết gì về giao diện hay HTTP.
 
-  types       Node, Problem, Domain và các hằng số
+  models      Node, Problem, Domain và các hằng số
   primitives  Queue / Stack, child_node, solution
   algorithms  BFS, DFS, UCS, UCS_fast (bản chạy thuần, bám mã giả trên slide)
-  pseudocode  mã giả hiển thị, mỗi dòng có tag
-  tracing     search_trace: ghi vết từng dòng mã giả thành JSON cho giao diện
+  program     mã giả của từng thuật toán dưới dạng cây lệnh; tắt dòng, đổi chỗ dòng
+  engine      trình thực thi cây lệnh, mỗi dòng mã giả chạy một bước và được ghi lại
+  recorder    ghi nút và từng bước, gói kết quả JSON
+  pseudocode  các dòng mã giả để hiển thị
+  tracing     search_trace: điểm vào duy nhất để chạy một thuật toán có ghi vết
 
-Muốn thêm một thuật toán mới: viết bản chạy thuần ở algorithms.py, thêm mã giả ở pseudocode.py,
-thêm nhánh ghi vết ở tracing.py và đăng ký tên trong ALGORITHMS (types.py).
+Muốn thêm một thuật toán mới: viết bản chạy thuần ở algorithms.py, dựng cây lệnh ở program.py, viết hàm xử lý
+cho từng dòng mới ở engine.py (h_<tag> cho dòng thường, c_<tag> cho dòng if) và đăng ký tên trong ALGORITHMS
+(models.py). tests/test_golden_traces.py sẽ báo ngay nếu thuật toán cũ bị đổi kết quả.
 """
 
 from .algorithms import BFS, DFS, UCS, UCS_fast
@@ -25,7 +29,7 @@ from .primitives import (
 )
 from .pseudocode import get_source_lines
 from .tracing import search_trace
-from .types import (
+from .models import (
     ALGORITHMS,
     MAX_TRACE_ELEMENTS,
     UCS_ALGORITHMS,
