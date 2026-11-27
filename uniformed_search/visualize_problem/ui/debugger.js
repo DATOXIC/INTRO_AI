@@ -38,13 +38,23 @@
     },
     event_dup: {
       label: "gặp nút trùng", noValue: true,
-      test: (s) => s.event_type === "skip_explored" || s.event_type === "skip_frontier",
+      test: (s) => s.event_type === "skip_explored" || s.event_type === "skip_frontier" || s.event_type === "skip_cycle",
       why: () => "vừa gặp một nút trùng (bị bỏ qua)",
     },
     event_goal: {
       label: "tìm thấy đích", noValue: true,
       test: (s) => s.event_type === "goal_init" || s.event_type === "goal_early" || s.event_type === "goal_late",
       why: () => "vừa tìm thấy đích",
+    },
+    event_cutoff: {
+      label: "DLS / IDS chạm giới hạn (cutoff)", noValue: true,
+      test: (s) => s.event_type === "cutoff",
+      why: () => "vừa có một lời gọi trả về cutoff",
+    },
+    event_ids_iter: {
+      label: "IDS bắt đầu vòng lặp mới", noValue: true,
+      test: (s) => s.event_type === "ids_iter",
+      why: () => "IDS tăng giới hạn và bắt đầu lại từ gốc",
     },
     event_replace: {
       label: "UCS thay nút trong frontier", noValue: true,
@@ -110,6 +120,46 @@
     const algo = t.algorithm;
     const ucs = algo === "ucs" || algo === "ucs_fast";
     const defs = [];
+
+    if (algo === "dls" || algo === "ids") {
+      const out = [
+        {
+          label: "limit giảm đúng 1 sau mỗi lời gọi đệ quy",
+          tip: "recursive_dls(child, problem, limit - 1): khung con luôn có limit nhỏ hơn khung cha đúng 1.",
+          check: (prev, cur, mem, stepIdx) => {
+            const lim = t.steps[stepIdx].frame_limits || [];
+            const n = lim.length;
+            const ok = n < 2 || lim[n - 2] - lim[n - 1] === 1;
+            mem.bad = ok ? null : `limit của lời gọi mới là ${lim[n - 1]}, của lời gọi cha là ${lim[n - 2]}`;
+            return ok;
+          },
+          stateful: true,
+        },
+        {
+          label: "tầng của nút + limit còn lại luôn bằng giới hạn gốc",
+          tip: "Đi sâu thêm một tầng thì limit giảm một, nên tầng + limit không đổi và không bao giờ vượt giới hạn.",
+          check: (prev, cur, mem, stepIdx) => {
+            const lim = t.steps[stepIdx].frame_limits || [];
+            const root = lim[0];
+            const ok = root === undefined || t.nodes[cur].depth + lim[lim.length - 1] === root;
+            mem.bad = ok ? null : `nút #${cur} ở tầng ${t.nodes[cur].depth} nhưng limit còn ${lim[lim.length - 1]} (gốc ${root})`;
+            return ok;
+          },
+          stateful: true,
+        },
+      ];
+      return out.map((d) => ({ ...d, mem: {}, violation: null, popsSeen: 0, firstPop: null }))
+        .map((inv) => {
+          for (let i = 1; i < t.steps.length; i += 1) {
+            const s = t.steps[i];
+            if (s.event_type !== "dequeue" || s.cur_id === null) continue;
+            if (inv.firstPop === null) inv.firstPop = i;
+            if (inv.violation) continue;
+            if (!inv.check(null, s.cur_id, inv.mem, i)) inv.violation = { step: i, text: inv.mem.bad };
+          }
+          return inv;
+        });
+    }
 
     if (algo === "bfs") {
       defs.push({
@@ -429,7 +479,9 @@
   function stepOver() {
     const t = trace();
     if (!t || host().predictActive()) return;
-    const boundary = new Set(["gen_child", "dequeue", "goal_init", "goal_early", "goal_late", "failure", "limit_reached"]);
+    const boundary = new Set([
+      "gen_child", "dequeue", "goal_init", "goal_early", "goal_late", "failure", "limit_reached", "ids_iter", "cutoff_result",
+    ]);
     let i = host().getStep() + 1;
     while (i < t.steps.length - 1 && !boundary.has(t.steps[i].event_type)) i += 1;
     host().goTo(Math.min(i, t.steps.length - 1));

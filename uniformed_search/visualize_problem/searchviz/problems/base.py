@@ -16,6 +16,7 @@ class SolveOptions:
     max_nodes: int = 300
     force_run: bool = False
     edits: Any = None
+    depth_limit: int = 3
 
 
 def parse_bool(value: Any, name: str, default: bool) -> bool:

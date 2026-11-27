@@ -34,6 +34,8 @@
             <button type="button" class="seg-btn" data-algo="dfs">DFS</button>
             <button type="button" class="seg-btn" data-algo="ucs" title="UCS đúng mã giả trên slide (có REPLACE nút trong frontier)">UCS</button>
             <button type="button" class="seg-btn" data-algo="ucs_fast" title="UCS tối ưu: best_cost, nút cũ bị bỏ qua khi pop">UCS tối ưu</button>
+            <button type="button" class="seg-btn" data-algo="dls" title="DLS đệ quy: DFS có giới hạn độ sâu, trả về lời giải / cutoff / failure">DLS</button>
+            <button type="button" class="seg-btn" data-algo="ids" title="IDS đệ quy: lặp DLS với giới hạn 0, 1, 2, ... đến khi tìm thấy">IDS</button>
           </div>
           <select id="presetSelect" class="select-input" aria-label="Chọn đề bài mẫu"></select>
         </div>
@@ -82,11 +84,21 @@
 
       <p id="ucsOptionNote" class="option-note-block hidden">UCS luôn là <b>Graph Search</b> và kiểm tra đích <b>khi lấy nút ra</b> (Late Goal), đúng như mã giả trên slide, nên hai tùy chọn dưới đây không áp dụng.</p>
 
+      <p id="recOptionNote" class="option-note-block hidden">DLS và IDS là thuật toán <b>đệ quy</b>: không có frontier, <b>ngăn xếp lời gọi</b> thay thế nó. Ô bên dưới bật <b>kiểm tra chu trình</b> (bản tối ưu); tắt đi là đúng mã giả gốc (bản chưa tối ưu).</p>
+
+      <div id="depthLimitBlock" class="option-block hidden">
+        <label class="control-label" for="depthLimitInput">Giới hạn độ sâu l</label>
+        <div class="inline-pair">
+          <input id="depthLimitInput" type="number" class="num-input" min="0" max="30" step="1" value="3" aria-label="Giới hạn độ sâu của DLS" />
+          <span class="option-note">tầng (IDS tự tăng 0, 1, 2, ...)</span>
+        </div>
+      </div>
+
       <label class="option-toggle">
         <input type="checkbox" id="graphSearchToggle" checked />
         <span>
-          <strong>Graph Search</strong>
-          <small>Bỏ qua trạng thái đã gặp. Tắt đi để thấy cây phình to (Tree Search).</small>
+          <strong id="graphSearchLabel">Graph Search</strong>
+          <small id="graphSearchHint">Bỏ qua trạng thái đã gặp. Tắt đi để thấy cây phình to (Tree Search).</small>
         </span>
       </label>
 
@@ -122,7 +134,7 @@
       <div class="kpi-card"><span class="kpi-label">Đã mở rộng</span><span id="kpiExpanded" class="kpi-val">0</span></div>
       <div class="kpi-card"><span class="kpi-label">Đã sinh</span><span id="kpiGenerated" class="kpi-val">0</span></div>
       <div class="kpi-card"><span class="kpi-label">Bị bỏ qua (trùng)</span><span id="kpiSkipped" class="kpi-val kpi-rose">0</span></div>
-      <div class="kpi-card"><span class="kpi-label">Hàng đợi dài nhất</span><span id="kpiMaxFrontier" class="kpi-val kpi-indigo">0</span></div>
+      <div class="kpi-card"><span id="kpiMaxFrontierLabel" class="kpi-label">Hàng đợi dài nhất</span><span id="kpiMaxFrontier" class="kpi-val kpi-indigo">0</span></div>
       <div class="kpi-card"><span class="kpi-label">Lời giải · nhánh TB</span><span id="kpiSolutionBranch" class="kpi-val kpi-emerald">—</span></div>
       <div class="kpi-card"><span class="kpi-label">Chi phí lời giải</span><span id="kpiCost" class="kpi-val kpi-indigo">—</span></div>
     </div>
@@ -211,13 +223,13 @@
 
               <div class="checklist" data-zone="check" id="checklist">
                 <div class="check-row" id="chkExplored" data-state="idle">
-                  <span class="check-icon">·</span><span class="check-text"><code>child</code> chưa có trong <code>explored</code></span>
+                  <span class="check-icon">·</span><span class="check-text"><code>child</code> chưa có trong <code>explored</code></span><span class="check-answer"></span>
                 </div>
                 <div class="check-row" id="chkFrontier" data-state="idle">
-                  <span class="check-icon">·</span><span class="check-text"><code>child</code> chưa có trong <code>frontier</code></span>
+                  <span class="check-icon">·</span><span class="check-text"><code>child</code> chưa có trong <code>frontier</code></span><span class="check-answer"></span>
                 </div>
                 <div class="check-row" id="chkGoal" data-state="idle">
-                  <span class="check-icon">·</span><span class="check-text"><code>child</code> chưa phải <b>đích</b></span>
+                  <span class="check-icon">·</span><span class="check-text"><code>child</code> chưa phải <b>đích</b></span><span class="check-answer"></span>
                 </div>
                 <div id="checkVerdict" class="check-verdict"></div>
                 <div class="goal-peek" title="Trạng thái đích cần đạt tới">
@@ -236,7 +248,7 @@
 
           <div class="stage-block" data-zone="explored">
             <div class="block-head">
-              <span class="block-title"><i class="dot dot-sky"></i>explored <small>đã mở rộng xong</small> <span id="exploredCountBadge" class="count-pill pill-sky">0</span></span>
+              <span class="block-title"><i class="dot dot-sky"></i>explored <small id="exploredKind">đã mở rộng xong</small> <span id="exploredCountBadge" class="count-pill pill-sky">0</span></span>
             </div>
             <div id="exploredList" class="queue-strip"></div>
           </div>
@@ -277,10 +289,11 @@
             <div class="tree-legend">
               <span><i class="dot dot-indigo"></i>Đang mở rộng</span>
               <span><i class="dot dot-yellow"></i>Đang thử</span>
-              <span><i class="dot dot-amber"></i>Trong frontier</span>
-              <span><i class="dot dot-sky"></i>Đã duyệt</span>
+              <span><i class="dot dot-amber"></i><span id="legendFrontier">Trong frontier</span></span>
+              <span><i class="dot dot-sky"></i><span id="legendExplored">Đã duyệt</span></span>
               <span><i class="dot dot-rose"></i>Trùng (bị cắt)</span>
               <span id="legendStale" class="hidden"><i class="dot dot-slate"></i>Nút cũ (bị thay)</span>
+              <span id="legendCutoff" class="hidden"><i class="dot dot-orange"></i>Chạm giới hạn (cutoff)</span>
               <span><i class="dot dot-emerald"></i>Lời giải</span>
               <span><i class="order-chip">k</i>thứ tự mở rộng</span>
               <span id="legendCost" class="hidden"><b>g</b> = chi phí từ gốc</span>
@@ -305,6 +318,14 @@
             <p class="viz-note">Cây bên cạnh có thể chứa <b>cùng một trạng thái nhiều lần</b> (×k), trong khi không gian trạng thái chỉ có 8 nút. Đó là lý do cần tập <code>explored</code>.</p>
           </section>
         </div>
+
+        <details id="depthCard" class="analysis-card" open>
+          <summary class="card-summary">
+            <h2>Bảng nút theo tầng</h2>
+            <span class="section-sub" id="depthSummary">Mỗi tầng một hàng, mỗi ô là một nút</span>
+          </summary>
+          <div id="depthTable" class="depth-table" aria-label="Các nút xếp theo độ sâu"></div>
+        </details>
 
         <details id="analysisCard" class="analysis-card">
           <summary class="card-summary">

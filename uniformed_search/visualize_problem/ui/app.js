@@ -37,6 +37,25 @@
     limit_reached: { text: "CHẠM GIỚI HẠN", cls: "pill-amber" },
     failure: { text: "VÔ NGHIỆM", cls: "pill-rose" },
     program_error: { text: "LỖI CHƯƠNG TRÌNH", cls: "pill-rose" },
+    limit_ok: { text: "CÒN ĐƯỢC ĐI SÂU", cls: "pill-emerald" },
+    init_cutoff: { text: "cutoff_occurred = False", cls: "pill-sky" },
+    cutoff: { text: "CUTOFF · HẾT LƯỢT ĐI SÂU", cls: "pill-orange" },
+    skip_cycle: { text: "BỎ QUA · TRÙNG TỔ TIÊN", cls: "pill-rose" },
+    got_cutoff: { text: "CON TRẢ VỀ CUTOFF", cls: "pill-orange" },
+    got_failure: { text: "CON TRẢ VỀ FAILURE", cls: "pill-neutral" },
+    unwind: { text: "TRẢ LỜI GIẢI LÊN TRÊN", cls: "pill-emerald" },
+    return_end: { text: "KẾT THÚC LỜI GỌI", cls: "pill-neutral" },
+    ids_iter: { text: "IDS · VÒNG LẶP MỚI", cls: "pill-indigo" },
+    ids_next: { text: "IDS · TĂNG GIỚI HẠN", cls: "pill-orange" },
+    ids_done: { text: "IDS TRẢ VỀ LỜI GIẢI", cls: "pill-emerald" },
+    cutoff_result: { text: "DLS TRẢ VỀ CUTOFF", cls: "pill-orange" },
+  };
+
+  const REC_BADGES = {
+    dequeue: "GỌI recursive_dls",
+    check_late: "KIỂM TRA ĐÍCH",
+    check_pass: "KHÔNG CHU TRÌNH → ĐI TIẾP",
+    goal_late: "TỚI ĐÍCH",
   };
 
   const DFS_BADGES = {
@@ -51,9 +70,11 @@
   };
 
   const isUcs = (algorithm) => algorithm === "ucs" || algorithm === "ucs_fast";
+  const isRec = (algorithm) => algorithm === "dls" || algorithm === "ids";
 
   function badgeFor(ev, algorithm) {
     const base = EVENT_BADGES[ev] || { text: ev.toUpperCase(), cls: "pill-neutral" };
+    if (isRec(algorithm) && REC_BADGES[ev]) return { ...base, text: REC_BADGES[ev] };
     if (algorithm === "dfs" && DFS_BADGES[ev]) return { ...base, text: DFS_BADGES[ev] };
     if (isUcs(algorithm) && PQ_BADGES[ev]) return { ...base, text: PQ_BADGES[ev] };
     return base;
@@ -66,11 +87,22 @@
     container: "Hàng đợi ưu tiên",
     next: "g nhỏ nhất",
   };
+  const REC_LABELS = {
+    kind: "ngăn xếp lời gọi (đệ quy)",
+    out: "đáy = lời gọi gốc",
+    in: "gọi / trả về ở ĐỈNH ▶",
+    container: "Ngăn xếp lời gọi",
+    next: "Đang chạy",
+    explored: "các lời gọi đã trả về xong",
+    frontierTitle: "Ngăn xếp sâu nhất",
+  };
   const ALGO_LABELS = {
     bfs: { name: "BFS", kind: "hàng đợi FIFO", out: "◀ pop ở ĐẦU", in: "enqueue ở CUỐI ▶", container: "Hàng đợi", next: "Ra tiếp" },
     dfs: { name: "DFS", kind: "ngăn xếp LIFO", out: "đáy", in: "push & pop ở ĐỈNH ▶", container: "Ngăn xếp", next: "Pop tiếp" },
     ucs: { name: "UCS", ...PQ_LABELS },
     ucs_fast: { name: "UCS tối ưu", ...PQ_LABELS },
+    dls: { name: "DLS", ...REC_LABELS },
+    ids: { name: "IDS", ...REC_LABELS },
   };
 
   const state = {
@@ -110,6 +142,7 @@
       renderStep();
     },
     predictActive: () => state.predict.enabled,
+    isRecursive: () => isRec(state.algorithm),
     rerun: () => runSearch(false),
     solveOriginal: () => apiJson("/api/solve", { method: "POST", body: JSON.stringify(buildPayload(true)) }),
   };
@@ -136,6 +169,17 @@
     costLegend: document.getElementById("costLegend"),
     kpiCost: document.getElementById("kpiCost"),
     ucsOptionNote: document.getElementById("ucsOptionNote"),
+    recOptionNote: document.getElementById("recOptionNote"),
+    depthLimitBlock: document.getElementById("depthLimitBlock"),
+    depthLimitInput: document.getElementById("depthLimitInput"),
+    graphSearchLabel: document.getElementById("graphSearchLabel"),
+    graphSearchHint: document.getElementById("graphSearchHint"),
+    kpiMaxFrontierLabel: document.getElementById("kpiMaxFrontierLabel"),
+    exploredKind: document.getElementById("exploredKind"),
+    legendCutoff: document.getElementById("legendCutoff"),
+    depthCard: document.getElementById("depthCard"),
+    depthTable: document.getElementById("depthTable"),
+    depthSummary: document.getElementById("depthSummary"),
     legendStale: document.getElementById("legendStale"),
     legendCost: document.getElementById("legendCost"),
     cmpAlgoA: document.getElementById("cmpAlgoA"),
@@ -573,12 +617,14 @@
     return box.childElementCount ? box : null;
   }
 
-  function renderCodePanel(sourceLines, activeLine, eventType, localVars) {
+  function renderCodePanel(sourceLines, activeLine, eventType, localVars, message = "") {
     els.codeLinesContainer.innerHTML = "";
     const activeCls =
-      ["skip_explored", "skip_frontier", "not_better", "skip_stale", "failure", "program_error"].includes(eventType)
+      ["skip_explored", "skip_frontier", "not_better", "skip_stale", "skip_cycle", "failure", "program_error"].includes(eventType)
         ? "active-rose"
-        : eventType === "goal_early" || eventType === "goal_late" || eventType === "goal_init"
+        : ["cutoff", "got_cutoff", "ids_next", "cutoff_result"].includes(eventType)
+        ? "active-amber"
+        : ["goal_early", "goal_late", "goal_init", "unwind", "ids_done"].includes(eventType)
         ? "active-emerald"
         : "active";
 
@@ -604,6 +650,12 @@
       const tools = buildLineTools(item);
       if (tools) row.appendChild(tools);
       els.codeLinesContainer.appendChild(row);
+      if (message && item.line === activeLine) {
+        const note = document.createElement("div");
+        note.className = `line-note note-${activeCls.replace("active", "").replace("-", "") || "info"}`;
+        note.textContent = message;
+        els.codeLinesContainer.appendChild(note);
+      }
     }
 
     els.localVarsContainer.innerHTML = "";
@@ -623,7 +675,7 @@
     }
   }
 
-  function createNodeCard(node, { cls = "", tag = null, clickable = true, cost = false } = {}) {
+  function createNodeCard(node, { cls = "", tag = null, clickable = true, cost = false, label = null } = {}) {
     const card = document.createElement("div");
     card.className = "node-card" + (cls ? ` ${cls}` : "");
     card.title =
@@ -636,7 +688,7 @@
     const idSpan = document.createElement("span");
     idSpan.textContent = `#${node.id}`;
     const depthSpan = document.createElement("span");
-    depthSpan.textContent = cost ? `g${node.path_cost}` : `d${node.depth}`;
+    depthSpan.textContent = label !== null ? label : cost ? `g${node.path_cost}` : `d${node.depth}`;
     top.append(idSpan, depthSpan);
     card.append(top, buildMiniBoard(node.state));
 
@@ -686,7 +738,7 @@
   const QUEUE_TAIL = 4;
   const EXPLORED_TAIL = 6;
 
-  function renderCardStrip(box, ids, nodes, { head, tail, optsFor, prepend = null, append = null, emptyText, cost = false }) {
+  function renderCardStrip(box, ids, nodes, { head, tail, optsFor, prepend = null, append = null, emptyText, cost = false, labelFor = null }) {
     box.innerHTML = "";
     if (prepend) box.appendChild(prepend);
     if (!ids.length) {
@@ -712,7 +764,7 @@
         box.appendChild(gap);
       }
       const opts = optsFor(ids[i], i);
-      const card = createNodeCard(nodes[ids[i]], { ...opts, cost });
+      const card = createNodeCard(nodes[ids[i]], { ...opts, cost, ...(labelFor ? { label: labelFor(i) } : {}) });
       box.appendChild(card);
       if (opts.highlight) focusEl = card;
       prev = i;
@@ -723,19 +775,30 @@
 
   function renderFrontierStrip(step, nodes, algorithm) {
     const labels = ALGO_LABELS[algorithm] || ALGO_LABELS.bfs;
-    const dfs = algorithm === "dfs";
+    const rec = isRec(algorithm);
+    const dfs = algorithm === "dfs" || rec;
     const cost = isUcs(algorithm);
     const ev = step.event_type;
-    const popId = ev === "dequeue" ? step.cur_id : null;
+    const popId = ev === "dequeue" && !rec ? step.cur_id : null;
     const staleId = ev === "skip_stale" ? step.cur_id : null;
-    const newId = ev === "enqueue" || ev === "init" || ev === "replace" ? step.candidate_id : null;
+    const newId = rec
+      ? ev === "dequeue" ? step.cur_id : null
+      : ev === "enqueue" || ev === "init" || ev === "replace" ? step.candidate_id : null;
+    const topId = rec && (ev === "cutoff" || ev === "return_end") ? step.cur_id : null;
+    const REC_GHOSTS = {
+      got_cutoff: { cls: "card-popped", tag: { text: "TRẢ VỀ cutoff ↑", cls: "pill-orange" } },
+      got_failure: { cls: "card-popped", tag: { text: "TRẢ VỀ failure ↑", cls: "pill-neutral" } },
+      unwind: { cls: "card-popped", tag: { text: "TRẢ VỀ lời giải ↑", cls: "pill-emerald" } },
+    };
     const dupId = ev === "skip_frontier" ? step.collision_id : null;
     const rivalId = ["dup_frontier", "better", "not_better"].includes(ev) ? step.collision_id : null;
     const ids = step.frontier_ids;
     const nextIdx = dfs ? ids.length - 1 : 0;
 
     const ghostSpec =
-      popId !== null
+      rec && REC_GHOSTS[ev] && step.candidate_id !== null
+        ? { id: step.candidate_id, ...REC_GHOSTS[ev] }
+        : popId !== null
         ? { id: popId, cls: "card-popped", tag: { text: "POP ↓", cls: "pill-amber" } }
         : staleId !== null
         ? { id: staleId, cls: "card-collision", tag: { text: "NÚT CŨ ✕", cls: "pill-rose" } }
@@ -751,7 +814,17 @@
       prepend: dfs ? null : ghost,
       append: dfs ? ghost : null,
       emptyText: `${labels.container} ${ghost ? "vừa cạn." : "đang rỗng."}`,
+      labelFor: rec && step.frame_limits ? (i) => `l=${step.frame_limits[i]}` : null,
       optsFor: (id, i) => {
+        if (rec) {
+          if (id === newId) return { cls: "card-new", tag: { text: "VỪA GỌI", cls: "pill-emerald" }, highlight: true };
+          if (id === topId) {
+            return ev === "cutoff"
+              ? { cls: "card-front", tag: { text: "CUTOFF", cls: "pill-orange" }, highlight: true }
+              : { cls: "card-front", tag: { text: "SẮP TRẢ VỀ", cls: "pill-neutral" }, highlight: true };
+          }
+          return i === ids.length - 1 && !ghost ? { cls: "card-front", tag: { text: labels.next, cls: "pill-amber" } } : {};
+        }
         const q = activePredictQuestion();
         if (q && q.type === "pop") {
           if (!q.answered) return { cls: "predict-choice" };
@@ -787,8 +860,15 @@
       head: 0,
       tail: EXPLORED_TAIL,
       cost: isUcs(algorithm),
-      emptyText: cfg.graph_search ? "Chưa có trạng thái nào được mở rộng xong." : "Tree Search: không có tập explored!",
+      emptyText: isRec(algorithm)
+        ? "Chưa có lời gọi nào trả về."
+        : cfg.graph_search ? "Chưa có trạng thái nào được mở rộng xong." : "Tree Search: không có tập explored!",
       optsFor: (id) => {
+        if (isRec(algorithm)) {
+          return id === step.candidate_id && ["got_cutoff", "got_failure", "unwind"].includes(ev)
+            ? { cls: "card-new", tag: { text: "VỪA XONG", cls: "pill-emerald" }, highlight: true }
+            : {};
+        }
         if (id === dupId) return { cls: "card-collision", tag: { text: "TRÙNG!", cls: "pill-rose" }, highlight: true };
         if (id === newId) return { cls: "card-new", tag: { text: "MỚI", cls: "pill-emerald" }, highlight: true };
         return {};
@@ -838,7 +918,8 @@
     const node = state.trace.nodes[state.pinnedNodeId];
     els.pinnedNodeBar.classList.remove("hidden");
     const notes = [];
-    if (node.is_duplicate) notes.push(`Bị cắt — trùng #${node.duplicate_of} ở ${node.duplicate_reason}`);
+    if (node.is_duplicate) notes.push(`Bị cắt — trùng #${node.duplicate_of} ở ${dupWhere(node.duplicate_reason)}`);
+    if (isRec(state.trace.algorithm) && isCutoffAt(state.trace, node.id, state.currentStep)) notes.push("lời gọi trả về cutoff");
     if (node.superseded_by !== null && node.superseded_by !== undefined) notes.push(`bị thay bởi #${node.superseded_by}`);
     if (node.replaces !== null && node.replaces !== undefined) notes.push(`thay thế #${node.replaces}`);
     els.pinnedTitle.textContent = `Chi tiết nút #${node.id}${notes.length ? ` (${notes.join("; ")})` : ""}`;
@@ -886,6 +967,40 @@
     return ids.reverse();
   }
 
+  function cutoffInfo(trace) {
+    if (!trace._cut) {
+      const cuts = new Map();
+      const opens = new Map();
+      const push = (map, id, i) => {
+        if (!map.has(id)) map.set(id, []);
+        map.get(id).push(i);
+      };
+      trace.steps.forEach((s, i) => {
+        if (s.event_type === "cutoff") push(cuts, s.cur_id, i);
+        else if (s.event_type === "limit_ok") push(opens, s.cur_id, i);
+      });
+      trace._cut = { cuts, opens };
+    }
+    return trace._cut;
+  }
+
+  function isCutoffAt(trace, id, stepIdx) {
+    const { cuts, opens } = cutoffInfo(trace);
+    const list = cuts.get(id);
+    if (!list) return false;
+    let last = -1;
+    for (const i of list) {
+      if (i <= stepIdx) last = i;
+      else break;
+    }
+    if (last < 0) return false;
+    const later = opens.get(id);
+    if (later) for (const i of later) if (i > last && i <= stepIdx) return false;
+    return true;
+  }
+
+  const dupWhere = (reason) => (reason === "cycle" ? "tổ tiên trên đường đi (chu trình)" : reason);
+
   function expandRanks(trace) {
     if (!trace._ranks) {
       const expanded = trace.nodes
@@ -919,6 +1034,7 @@
     const nodes = trace.nodes;
     const showPruned = o.showPruned !== false;
     const ucs = isUcs(trace.algorithm);
+    const rec = isRec(trace.algorithm);
     const isSuperseded = (n) => n.superseded_step !== null && n.superseded_step !== undefined && stepIdx >= n.superseded_step;
 
     const isDupNow = (n) => n.is_duplicate && stepIdx >= (n.resolved_step ?? n.created_step);
@@ -1032,6 +1148,8 @@
         fill = "#4f46e5"; stroke = "#312e81"; textFill = "#ffffff"; sw = 2.4;
       } else if (n.id === step.collision_id) {
         fill = "#ffe4e6"; stroke = "#e11d48"; textFill = "#9f1239"; sw = 2.5;
+      } else if (rec && !frontierSet.has(n.id) && isCutoffAt(trace, n.id, stepIdx)) {
+        fill = "#fff7ed"; stroke = "#f97316"; textFill = "#9a3412"; sw = 2; dashed = true;
       } else if (isSuperseded(n)) {
         fill = "#f1f5f9"; stroke = "#94a3b8"; textFill = "#64748b"; dashed = true;
       } else if (isDupNow(n)) {
@@ -1075,7 +1193,7 @@
 
       const title = svgEl("title");
       title.textContent = isDupNow(n)
-        ? `Nút #${n.id} (BỊ CẮT - trùng #${n.duplicate_of} trong ${n.duplicate_reason})`
+        ? `Nút #${n.id} (BỊ CẮT - trùng #${n.duplicate_of} ở ${dupWhere(n.duplicate_reason)})`
         : `Nút #${n.id} | tầng ${n.depth} | ${n.action || "ROOT"}${ucs ? ` | g=${n.path_cost}` : ""}${ranks.has(n.id) && n.expanded_step <= stepIdx ? ` | mở rộng thứ ${ranks.get(n.id)}` : ""}${n.manhattan != null ? " | Manhattan=" + n.manhattan : ""}`;
       g.appendChild(title);
       gRoot.appendChild(g);
@@ -1462,12 +1580,25 @@
     goal_init: ["cur"],
     limit_reached: [],
     failure: [],
+    ids_iter: ["frontier", "cur"],
+    limit_ok: ["check", "cur"],
+    init_cutoff: ["cur"],
+    cutoff: ["check", "cur"],
+    skip_cycle: ["check", "child"],
+    got_cutoff: ["frontier", "child"],
+    got_failure: ["frontier", "child"],
+    unwind: ["frontier", "child"],
+    return_end: ["frontier", "cur"],
+    ids_next: ["explored"],
+    ids_done: ["cur"],
+    cutoff_result: [],
   };
 
-  const ROOT_EVENTS = new Set(["init_root", "check_root", "init", "init_explored", "init_best"]);
+  const ROOT_EVENTS = new Set(["init_root", "check_root", "init", "init_explored", "init_best", "ids_iter"]);
   const CHILD_EVENTS = new Set([
     "gen_child", "check_pass", "check_goal", "skip_explored", "skip_frontier", "enqueue", "goal_early",
-    "dup_frontier", "better", "not_better", "replace", "update_best",
+    "dup_frontier", "better", "not_better", "replace", "update_best", "skip_cycle", "got_cutoff", "got_failure",
+    "unwind",
   ]);
 
   function applyFocus(eventType) {
@@ -1480,33 +1611,159 @@
 
   const CHECK_ICONS = { idle: "·", pass: "✓", fail: "✗", hit: "🎯", skipped: "–" };
   const CHECK_DEFAULT_HTML = {
-    explored: "<code>child</code> chưa có trong <code>explored</code>",
-    frontier: "<code>child</code> chưa có trong <code>frontier</code>",
-    goal: "<code>child</code> chưa phải <b>đích</b>",
+    explored: "<code>child</code> đã có trong <code>explored</code> ?",
+    frontier: "<code>child</code> đã có trong <code>frontier</code> ?",
+    goal: "<code>child</code> là <b>đích</b> ?",
   };
   const CHECK_UCS_HTML = {
     ucs: {
-      explored: "<code>child</code> chưa có trong <code>explored</code>",
-      frontier: "<code>child</code> chưa có trong <code>frontier</code>",
-      goal: "nếu đã có: <code>g(child)</code> &lt; <code>g</code> của nút cũ",
+      explored: "<code>child</code> đã có trong <code>explored</code> ?",
+      frontier: "<code>child</code> đã có trong <code>frontier</code> ?",
+      goal: "nếu đã có: <code>g(child)</code> &lt; <code>g</code> của nút cũ ?",
     },
     ucs_fast: {
-      explored: "<code>child</code> chưa có trong <code>explored</code>",
-      frontier: "<code>child</code> mới, hoặc <code>g(child)</code> &lt; <code>best_cost</code>",
+      explored: "<code>child</code> đã có trong <code>explored</code> ?",
+      frontier: "<code>child</code> mới, hoặc <code>g(child)</code> &lt; <code>best_cost</code> ?",
       goal: "",
     },
   };
+  const CHECK_REC_HTML = {
+    explored: "<code>is_goal(node)</code> ?",
+    frontier: "<code>limit == 0</code> ?",
+    goal: "<code>is_cycle(child)</code> ? (trùng một tổ tiên)",
+  };
+  const CHECK_ANSWERS = {
+    default: { explored: ["KHÔNG", "CÓ"], frontier: ["KHÔNG", "CÓ"], goal: ["KHÔNG", "CÓ"] },
+    ucs: { explored: ["KHÔNG", "CÓ"], frontier: ["KHÔNG", "CÓ"], goal: ["CÓ", "KHÔNG"] },
+    ucs_fast: { explored: ["KHÔNG", "CÓ"], frontier: ["CÓ", "KHÔNG"], goal: ["KHÔNG", "CÓ"] },
+    rec: { explored: ["KHÔNG", "CÓ"], frontier: ["KHÔNG", "CÓ"], goal: ["KHÔNG", "CÓ"] },
+  };
 
-  function setCheckRow(el, status, html) {
+  function setCheckRow(el, status, html, answers) {
     el.dataset.state = status === "hit" ? "pass" : status;
     el.querySelector(".check-icon").textContent = CHECK_ICONS[status];
     el.querySelector(".check-text").innerHTML = html;
+    const chip = el.querySelector(".check-answer");
+    if (!chip) return;
+    chip.textContent =
+      status === "pass" ? answers[0] : status === "fail" ? answers[1] : status === "hit" ? "CÓ" : status === "skipped" ? "bỏ qua" : "—";
+  }
+
+  function renderChecklistRec(step, cfg) {
+    els.chkExplored.classList.remove("hidden");
+    els.chkFrontier.classList.remove("hidden");
+    els.chkGoal.classList.toggle("hidden", !cfg.graph_search);
+    const st = { explored: "idle", frontier: "idle", goal: "idle" };
+    let verdict = null;
+    const wait = (text) => ({ cls: "verdict-wait", text });
+    const bad = (text, soi) => ({ cls: "verdict-bad", text, soi });
+    const good = (text) => ({ cls: "verdict-good", text });
+    const inCall = () => {
+      st.explored = "pass";
+      st.frontier = "pass";
+    };
+    switch (step.event_type) {
+      case "ids_iter":
+        verdict = wait("Vòng lặp mới: bắt đầu lại từ nút gốc");
+        break;
+      case "dequeue":
+        verdict = wait("Vừa vào lời gọi mới — sắp kiểm tra đích và limit…");
+        break;
+      case "check_late":
+        st.explored = "pass";
+        verdict = wait("Chưa phải đích → xét limit");
+        break;
+      case "goal_late":
+        st.explored = "hit";
+        verdict = good("is_goal(node) đúng — tìm thấy lời giải!");
+        break;
+      case "cutoff":
+        st.explored = "pass";
+        st.frontier = "fail";
+        verdict = wait("limit = 0 → return cutoff (hết lượt đi sâu)");
+        break;
+      case "limit_ok":
+      case "init_cutoff":
+        inCall();
+        verdict = wait("limit > 0 → mở rộng nút này");
+        break;
+      case "gen_child":
+        inCall();
+        verdict = wait("Vừa sinh nút con — sắp kiểm tra chu trình…");
+        break;
+      case "check_pass":
+        inCall();
+        st.goal = "pass";
+        verdict = wait("Không trùng tổ tiên → gọi đệ quy với limit - 1");
+        break;
+      case "skip_cycle":
+        inCall();
+        st.goal = "fail";
+        verdict = bad("✗ BỎ QUA nút con (chu trình)", step.collision_id);
+        break;
+      case "got_cutoff":
+        inCall();
+        st.goal = "pass";
+        verdict = wait("Con trả về cutoff → ghi nhớ cutoff_occurred");
+        break;
+      case "got_failure":
+        inCall();
+        st.goal = "pass";
+        verdict = wait("Con trả về failure → thử nước kế tiếp");
+        break;
+      case "unwind":
+        inCall();
+        st.goal = "pass";
+        verdict = good("Con trả về lời giải → chuyển lên trên");
+        break;
+      case "return_end":
+        inCall();
+        verdict = wait("Hết các nước đi → return cutoff hoặc failure");
+        break;
+      case "ids_next":
+        verdict = wait("cutoff → IDS tăng giới hạn rồi lặp lại");
+        break;
+      case "ids_done":
+        verdict = good("IDS trả về lời giải");
+        break;
+      case "cutoff_result":
+        verdict = wait("DLS trả về cutoff: chưa kết luận");
+        break;
+      default:
+        break;
+    }
+    setCheckRow(els.chkExplored, st.explored, CHECK_REC_HTML.explored, CHECK_ANSWERS.rec.explored);
+    setCheckRow(els.chkFrontier, st.frontier, CHECK_REC_HTML.frontier, CHECK_ANSWERS.rec.frontier);
+    setCheckRow(els.chkGoal, st.goal, CHECK_REC_HTML.goal, CHECK_ANSWERS.rec.goal);
+    renderVerdict(verdict, true);
+  }
+
+  function renderVerdict(verdict, ucsLike) {
+    els.checkVerdict.innerHTML = "";
+    if (!verdict) return;
+    const span = document.createElement("span");
+    span.className = verdict.cls;
+    span.textContent = verdict.text;
+    els.checkVerdict.appendChild(span);
+    if (verdict.soi !== undefined && verdict.soi !== null) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-secondary btn-xs";
+      btn.textContent = ucsLike ? `Soi nút #${verdict.soi}` : `Soi nút trùng #${verdict.soi}`;
+      btn.addEventListener("click", () => selectPinnedNode(verdict.soi));
+      els.checkVerdict.appendChild(btn);
+    }
   }
 
   function renderChecklist(step, cfg, algorithm) {
+    if (isRec(algorithm)) {
+      renderChecklistRec(step, cfg);
+      return;
+    }
     const ucs = isUcs(algorithm);
     const fast = algorithm === "ucs_fast";
     const rows = ucs ? CHECK_UCS_HTML[algorithm] : CHECK_DEFAULT_HTML;
+    const answers = CHECK_ANSWERS[ucs ? algorithm : "default"];
     els.chkExplored.classList.toggle("hidden", !cfg.graph_search);
     els.chkFrontier.classList.toggle("hidden", !cfg.graph_search);
     els.chkGoal.classList.toggle("hidden", ucs ? fast : !cfg.early_goal_test);
@@ -1608,25 +1865,10 @@
         break;
     }
 
-    setCheckRow(els.chkExplored, st.explored, rows.explored);
-    setCheckRow(els.chkFrontier, st.frontier, rows.frontier);
-    setCheckRow(els.chkGoal, st.goal, goalHtml || rows.goal);
-
-    els.checkVerdict.innerHTML = "";
-    if (verdict) {
-      const span = document.createElement("span");
-      span.className = verdict.cls;
-      span.textContent = verdict.text;
-      els.checkVerdict.appendChild(span);
-      if (verdict.soi !== undefined && verdict.soi !== null) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "btn btn-secondary btn-xs";
-        btn.textContent = ucs ? `Soi nút #${verdict.soi}` : `Soi nút trùng #${verdict.soi}`;
-        btn.addEventListener("click", () => selectPinnedNode(verdict.soi));
-        els.checkVerdict.appendChild(btn);
-      }
-    }
+    setCheckRow(els.chkExplored, st.explored, rows.explored, answers.explored);
+    setCheckRow(els.chkFrontier, st.frontier, rows.frontier, answers.frontier);
+    setCheckRow(els.chkGoal, st.goal, goalHtml || rows.goal, answers.goal);
+    renderVerdict(verdict, ucs);
   }
 
   const nodeBadge = (node, ucs) => `#${node.id} · ${ucs ? `g=${node.path_cost}` : `d=${node.depth}`}`;
@@ -1654,7 +1896,7 @@
     if (isRootPhase) curNode = nodes[0];
     const candNode = step.candidate_id !== null ? nodes[step.candidate_id] : null;
     const childShown = Boolean(candNode) && CHILD_EVENTS.has(ev);
-    const isDup = ev === "skip_explored" || ev === "skip_frontier" || ev === "not_better";
+    const isDup = ev === "skip_explored" || ev === "skip_frontier" || ev === "not_better" || ev === "skip_cycle";
     const ucs = isUcs(trace.algorithm);
     const isGoalChild = ev === "goal_early";
     const isGoalCur = ev === "goal_late" || ev === "goal_init";
@@ -1726,6 +1968,60 @@
     renderCostLegend(trace);
   }
 
+  function renderDepthTable(step, trace) {
+    const box = els.depthTable;
+    box.innerHTML = "";
+    if (!trace || trace.compare || !step || !els.depthCard.open) return;
+    const idx = step.index;
+    const nodes = trace.nodes;
+    const rec = isRec(trace.algorithm);
+    const cost = isUcs(trace.algorithm);
+    const isDupNow = (n) => n.is_duplicate && idx >= (n.resolved_step ?? n.created_step);
+
+    const levels = new Map();
+    let shown = 0;
+    for (const n of nodes) {
+      if (n.created_step > idx) continue;
+      shown += 1;
+      if (!levels.has(n.depth)) levels.set(n.depth, []);
+      levels.get(n.depth).push(n.id);
+    }
+    els.depthSummary.textContent = `${shown} nút · ${levels.size} tầng`;
+
+    const frontierSet = new Set(step.frontier_ids);
+    const exploredSet = new Set(step.explored_ids);
+    const solutionSet = new Set(step.solution_ids || []);
+
+    const optsFor = (id) => {
+      const n = nodes[id];
+      if (solutionSet.has(id)) return { cls: "card-new", tag: { text: "LỜI GIẢI", cls: "pill-emerald" }, highlight: true };
+      if (id === step.cur_id) return { cls: "card-current", tag: { text: "ĐANG XÉT", cls: "pill-indigo" }, highlight: true };
+      if (id === step.candidate_id) return { cls: "card-front", tag: { text: "ĐANG THỬ", cls: "pill-neutral" }, highlight: true };
+      if (isDupNow(n)) return { cls: "card-stale", tag: { text: "TRÙNG", cls: "pill-rose" } };
+      if (rec && !frontierSet.has(id) && isCutoffAt(trace, id, idx)) {
+        return { cls: "card-stale", tag: { text: "CUTOFF", cls: "pill-orange" } };
+      }
+      if (frontierSet.has(id)) return { cls: "card-front", tag: { text: rec ? "TRÊN NGĂN XẾP" : "ĐANG CHỜ", cls: "pill-amber" } };
+      if (exploredSet.has(id)) return { tag: { text: "XONG", cls: "pill-sky" } };
+      return {};
+    };
+
+    for (const depth of [...levels.keys()].sort((a, b) => a - b)) {
+      const ids = levels.get(depth);
+      const row = document.createElement("div");
+      row.className = "depth-row" + (step.cur_id !== null && nodes[step.cur_id] && nodes[step.cur_id].depth === depth ? " depth-row-active" : "");
+      const head = document.createElement("div");
+      head.className = "depth-head";
+      const dupCount = ids.filter((id) => isDupNow(nodes[id])).length;
+      head.innerHTML = `<strong>Tầng ${depth}</strong><span>${ids.length} nút${dupCount ? ` · ${dupCount} bị cắt` : ""}</span>`;
+      const strip = document.createElement("div");
+      strip.className = "queue-strip depth-strip";
+      renderCardStrip(strip, ids, nodes, { head: 6, tail: 4, cost, optsFor, emptyText: "—" });
+      row.append(head, strip);
+      box.appendChild(row);
+    }
+  }
+
   function renderStep() {
     const trace = state.trace;
     if (trace && trace.compare) {
@@ -1765,6 +2061,7 @@
       els.vacGraphSvg.innerHTML = "";
       renderCostLegend(null);
       renderSearchTree();
+      els.depthTable.innerHTML = "";
       if (window.SearchDebugger) window.SearchDebugger.afterRender();
       return;
     }
@@ -1804,12 +2101,15 @@
     renderGoal(trace);
     renderWork(step, trace);
 
-    els.modeSummaryTag.textContent = isUcs(algorithm)
+    els.modeSummaryTag.textContent = isRec(algorithm)
+      ? `Đệ quy · ${algorithm === "dls" ? `l = ${trace.depth_limit}` : "l tăng dần"} · ${trace.config.graph_search ? "có is_cycle" : "không is_cycle"}`
+      : isUcs(algorithm)
       ? "Graph · Late Goal · ưu tiên theo g"
       : `${trace.config.graph_search ? "Graph" : "Tree"} · ${trace.config.early_goal_test ? "Early Goal" : "Late Goal"}`;
+    els.legendCutoff.classList.toggle("hidden", !isRec(algorithm));
     els.legendStale.classList.toggle("hidden", !isUcs(algorithm));
     els.legendCost.classList.toggle("hidden", !isUcs(algorithm));
-    renderCodePanel(trace.source_lines, step.line, step.event_type, step.vars);
+    renderCodePanel(trace.source_lines, step.line, step.event_type, step.vars, step.message);
 
     els.frontierCountBadge.textContent = String(step.frontier_ids.length);
     els.exploredCountBadge.textContent = String(step.explored_ids.length);
@@ -1831,6 +2131,7 @@
     els.vizRow.classList.toggle("has-graph", showGraph);
     els.graphCard.classList.toggle("hidden", !showGraph);
     renderSearchTree();
+    renderDepthTable(step, trace);
     if (showGraph) drawVacuumGraph(els.vacGraphSvg, trace, state.currentStep);
     if (els.analysisCard.open) renderMemoryChart();
     renderPinnedNode();
@@ -1884,6 +2185,33 @@
 
       if (data.status === "program_error") {
         showAlert("", "Chương trình đã sửa không chạy được", data.error.message);
+      } else if (data.recursive && data.status === "cutoff") {
+        showAlert(
+          "warn",
+          `DLS trả về CUTOFF với giới hạn l = ${data.depth_limit}.`,
+          "Có nhánh bị cắt vì chạm giới hạn mà chưa thấy đích, nên chưa thể kết luận là vô nghiệm. Hãy tăng giới hạn l (trong Tùy chọn) hoặc dùng IDS để tự tăng dần."
+        );
+      } else if (data.recursive && data.status === "failure") {
+        showAlert(
+          "",
+          `${algoName} trả về FAILURE: đã duyệt hết cây mà không nhánh nào bị cắt.`,
+          data.solvability.explanation
+        );
+      } else if (data.recursive && data.status === "limit_reached") {
+        showAlert(
+          "warn",
+          `${algoName} đã dừng ở giới hạn an toàn ${payload.max_nodes} nút mở rộng (hoặc dữ liệu từng bước quá lớn).`,
+          data.config.graph_search
+            ? "Giảm giới hạn l, hoặc tăng giới hạn an toàn trong Tùy chọn."
+            : "Bạn đang tắt kiểm tra chu trình (đúng mã giả gốc nhưng chưa tối ưu): cây phình to vì cứ đi qua lại giữa các trạng thái cũ. Bật lại để so sánh."
+        );
+      } else if (data.recursive && data.status === "solved") {
+        showAlert(
+          data.config.graph_search ? "" : "warn",
+          `${algoName} tìm thấy lời giải ${data.summary.solution_length} bước${data.iterations ? ` ở vòng giới hạn l = ${data.iterations - 1}` : ""}.`,
+          `Đã sinh ${data.summary.nodes_generated} nút, mở rộng ${data.summary.nodes_expanded} lần, ngăn xếp sâu nhất ${data.summary.max_frontier_size}.` +
+            (data.config.graph_search ? " Đang bật kiểm tra chu trình (bản tối ưu)." : " Đang tắt kiểm tra chu trình (đúng mã giả gốc, chưa tối ưu).")
+        );
       } else if (data.program && data.status === "limit_reached") {
         showAlert(
           "warn",
@@ -1930,8 +2258,8 @@
     }
   }
 
-  const ALGO_ORDER = ["bfs", "dfs", "ucs", "ucs_fast"];
-  const ALGO_COLORS = { bfs: "#4f46e5", dfs: "#0d9488", ucs: "#ea580c", ucs_fast: "#9333ea" };
+  const ALGO_ORDER = ["bfs", "dfs", "ucs", "ucs_fast", "dls", "ids"];
+  const ALGO_COLORS = { bfs: "#4f46e5", dfs: "#0d9488", ucs: "#ea580c", ucs_fast: "#9333ea", dls: "#0891b2", ids: "#db2777" };
   const CMP_HEAD = 3;
   const CMP_TAIL = 4;
 
@@ -1943,6 +2271,7 @@
       early_goal_test: els.earlyGoalToggle.checked,
       max_nodes: Number(els.maxNodesInput.value) || 300,
       force_run: forceRun,
+      depth_limit: Math.max(0, Math.min(30, Math.round(Number(els.depthLimitInput.value)))) || 0,
     };
     if (state.problem === "vacuum") {
       payload.start_state = state.vacStart;
@@ -1961,7 +2290,7 @@
       if (st.event_type === "dequeue") dequeueIdx.push(i);
     });
     const n = dequeueIdx.length;
-    const tickEnd = [n > 0 ? dequeueIdx[0] - 1 : steps.length - 1];
+    const tickEnd = [n > 0 ? Math.max(0, dequeueIdx[0] - 1) : steps.length - 1];
     for (let k = 1; k <= n; k++) tickEnd.push((k < n ? dequeueIdx[k] : steps.length) - 1);
     const depthSeries = [0];
     for (let k = 1; k <= n; k++) depthSeries.push(trace.nodes[steps[dequeueIdx[k - 1]].cur_id].depth);
@@ -1972,6 +2301,7 @@
   function resultLabel(status) {
     if (status === "solved") return { text: "✓ Tìm thấy", cls: "pill-emerald" };
     if (status === "limit_reached") return { text: "⚠ Chạm giới hạn", cls: "pill-amber" };
+    if (status === "cutoff") return { text: "⚠ Cutoff (chưa kết luận)", cls: "pill-amber" };
     return { text: "✕ Không có lời giải", cls: "pill-rose" };
   }
 
@@ -2443,7 +2773,7 @@
     const steps = state.trace.steps;
     const cur = steps[idx];
     const nxt = steps[idx + 1];
-    if (!nxt) return null;
+    if (!nxt || isRec(state.trace.algorithm)) return null;
     if (nxt.event_type === "dequeue" && cur.frontier_ids.length > 1) {
       return { type: "pop", stepIdx: idx, answerId: nxt.cur_id, answered: false };
     }
@@ -2689,11 +3019,23 @@
       b.classList.toggle("active", b.dataset.algo === state.algorithm);
     });
     const ucs = isUcs(state.algorithm);
-    for (const toggle of [els.graphSearchToggle, els.earlyGoalToggle]) {
-      toggle.disabled = ucs;
-      toggle.closest(".option-toggle").classList.toggle("is-locked", ucs);
-    }
+    const rec = isRec(state.algorithm);
+    els.graphSearchToggle.disabled = ucs;
+    els.graphSearchToggle.closest(".option-toggle").classList.toggle("is-locked", ucs);
+    els.earlyGoalToggle.disabled = ucs || rec;
+    els.earlyGoalToggle.closest(".option-toggle").classList.toggle("is-locked", ucs || rec);
     els.ucsOptionNote.classList.toggle("hidden", !ucs);
+    els.recOptionNote.classList.toggle("hidden", !rec);
+    els.depthLimitBlock.classList.toggle("hidden", state.algorithm !== "dls");
+    els.graphSearchLabel.textContent = rec ? "Kiểm tra chu trình (is_cycle)" : "Graph Search";
+    els.graphSearchHint.textContent = rec
+      ? "Bỏ qua nút con trùng một tổ tiên trên đường đi hiện tại. Tắt đi là đúng mã giả gốc (chưa tối ưu)."
+      : "Bỏ qua trạng thái đã gặp. Tắt đi để thấy cây phình to (Tree Search).";
+    els.exploredKind.textContent = rec ? labels.explored : "đã mở rộng xong";
+    document.getElementById("legendFrontier").textContent = rec ? "Trên ngăn xếp lời gọi" : "Trong frontier";
+    document.getElementById("legendExplored").textContent = rec ? "Đã trả về xong" : "Đã duyệt";
+    els.kpiMaxFrontierLabel.textContent = rec ? labels.frontierTitle : "Hàng đợi dài nhất";
+    if (window.SearchWhatIf) window.SearchWhatIf.reset();
   }
 
   async function setProblem(problem, { run = true } = {}) {
@@ -2967,6 +3309,11 @@
 
     els.shuffleBtn.addEventListener("click", doShuffle);
     els.runBtn.addEventListener("click", () => runSearch(false));
+    els.depthLimitInput.addEventListener("change", () => runSearch(false));
+    els.depthCard.addEventListener("toggle", () => {
+      if (!state.trace || state.trace.compare || !state.trace.steps.length) return;
+      renderDepthTable(state.trace.steps[state.currentStep], state.trace);
+    });
     els.graphSearchToggle.addEventListener("change", () => {
       if (window.SearchWhatIf) window.SearchWhatIf.reset();
       runSearch(false);

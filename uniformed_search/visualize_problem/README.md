@@ -2,7 +2,7 @@
 
 Trực quan hóa các thuật toán tìm kiếm cổ điển (môn Introduction to AI).
 Hiện có:
-- **Thuật toán:** BFS, DFS, UCS (đúng mã giả trên slide, có `REPLACE` nút trong frontier) và UCS tối ưu (`best_cost`, bỏ qua nút cũ khi pop).
+- **Thuật toán:** BFS, DFS, UCS (đúng mã giả trên slide, có `REPLACE` nút trong frontier), UCS tối ưu (`best_cost`, bỏ qua nút cũ khi pop), **DLS** và **IDS** (đệ quy theo AIMA, xem mục dưới).
 - **Bài toán:** n-Puzzle (2×2, 3×3, 4×4) và Vacuum Robot với 2–6 phòng.
 - **Chi phí hành động** (chỉ UCS dùng để chọn nút; BFS/DFS vẫn báo chi phí lời giải): n-Puzzle Lên/Xuống = 1, Trái/Phải = 2; Vacuum di chuyển = 2, hút bụi = 1.
 - Chế độ **so sánh** hai thuật toán bất kỳ trên cùng bài toán và chế độ **dự đoán**.
@@ -49,7 +49,8 @@ visualize_problem/
 │   ├── core/               lõi thuật toán, không biết bài toán cụ thể
 │   │   ├── models.py         Node, Problem, Domain, hằng số
 │   │   ├── primitives.py     Queue/Stack, child_node, solution
-│   │   ├── algorithms.py     BFS, DFS, UCS, UCS_fast (bản chạy thuần)
+│   │   ├── algorithms.py     BFS, DFS, UCS, UCS_fast, DLS, IDS (bản chạy thuần)
+│   │   ├── recursive.py      DLS / IDS đệ quy có ghi vết (ngăn xếp lời gọi thay frontier)
 │   │   ├── program.py        mã giả dưới dạng cây lệnh; tắt dòng, đổi chỗ dòng
 │   │   ├── engine.py         trình thực thi cây lệnh, ghi từng dòng đã chạy
 │   │   ├── recorder.py       ghi nút/bước, gói kết quả JSON
@@ -65,8 +66,8 @@ visualize_problem/
 ├── ui/                     giao diện: index.html, styles.css, app.js (trình xem chính),
 │                           debugger.js (điểm dừng), whatif.js (tắt/đổi chỗ dòng), theme.js,
 │                           pyodide_worker.js (chạy Python trong trình duyệt)
-├── tests/                  test_bfs_core, test_ucs, test_program_edits, test_golden_traces,
-│                           test_structure
+├── tests/                  test_bfs_core, test_ucs, test_program_edits, test_recursive,
+│                           test_golden_traces, test_structure
 ├── tools/build_site.py     đóng gói dist/ cho GitHub Pages
 └── run.py                  chạy cục bộ
 ```
@@ -109,6 +110,18 @@ bấm ⊘ để tắt, ▲ ▼ để đổi chỗ với dòng kế bên cùng kh
 bản gốc. Dòng dùng biến chưa tạo cho ra lỗi chương trình dễ hiểu; vòng lặp vô hạn bị chặn bởi giới hạn an toàn.
 Các dòng `def`, `while`, `for`, `return` không tắt được, `def` và `return None` không đổi chỗ được.
 API: thêm `"program": {"disabled": [tag], "order": {khối: [tag]}}` vào `/api/solve`.
+
+## DLS và IDS (đệ quy)
+
+Viết đúng như giáo trình: `recursive_dls(node, problem, limit)` trả về lời giải, `cutoff` (có nhánh chạm giới hạn
+độ sâu) hoặc `failure` (đã duyệt hết cây). IDS lặp với giới hạn 0, 1, 2, ... đến khi kết quả khác `cutoff`.
+- Không có frontier: ô "frontier" trên giao diện là **ngăn xếp lời gọi** (mỗi thẻ ghi `l=` là `limit` còn lại của lời gọi đó),
+  ô "explored" là các lời gọi **đã trả về xong**.
+- Ô **Kiểm tra chu trình** trong Tùy chọn: bật là thêm dòng `if is_cycle(child): continue` (chỉ so với tổ tiên trên đường
+  đi hiện tại, bản tối ưu, DLS trả `failure` thật khi vô nghiệm); tắt là đúng mã giả gốc (chưa tối ưu).
+- DLS có ô **Giới hạn độ sâu l**; IDS tự tăng. Cây của IDS là cây của vòng sâu nhất (cùng đường đi dùng lại cùng `id`),
+  nhưng "Đã sinh / Đã mở rộng" đếm đủ mọi vòng nên thấy rõ chi phí lặp lại của IDS.
+- Mã giả DLS / IDS chỉ đọc (không tắt, đổi chỗ dòng) và chưa có chế độ Dự đoán. API: `"depth_limit"` (0 đến 30) cho DLS.
 
 ## Lưu ý về UCS
 

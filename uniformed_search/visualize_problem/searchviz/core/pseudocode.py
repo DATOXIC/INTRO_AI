@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from .models import UCS_ALGORITHMS
+from .models import RECURSIVE_ALGORITHMS, UCS_ALGORITHMS
 from .program import apply_edits, build_program, render_lines
+from .recursive import recursive_lines
 
 
 def get_source_lines(
@@ -19,6 +20,8 @@ def get_source_lines(
     edits: Any = None,
 ) -> list[dict[str, Any]]:
     """Các dòng mã giả có đánh số, khớp với tùy chọn đang chọn (và chỉnh sửa nếu có)."""
+    if algorithm in RECURSIVE_ALGORITHMS:
+        return recursive_lines(algorithm, graph_search)
     if algorithm in UCS_ALGORITHMS:
         graph_search, early_goal_test = True, False
     program, disabled, _ = apply_edits(build_program(algorithm, graph_search, early_goal_test), edits)

@@ -17,7 +17,7 @@ from .primitives import (
     push,
     solution,
 )
-from .models import Node, Problem, is_goal
+from .models import CUTOFF, Node, Problem, is_goal
 
 
 def BFS(puzzle: Problem) -> list[Any] | None:
@@ -92,6 +92,51 @@ def UCS(puzzle: Problem) -> list[Any] | None:
             elif pos != -1 and frontier[pos][2].path_cost > child.path_cost:
                 frontier[pos] = (child.path_cost, next(arrival), child)
                 heapq.heapify(frontier)
+    return None
+
+
+def _is_cycle(node: Node) -> bool:
+    ancestor = node.parent
+    while ancestor is not None:
+        if ancestor.state == node.state:
+            return True
+        ancestor = ancestor.parent
+    return False
+
+
+def _recursive_dls(puzzle: Problem, node: Node, limit: int, check_cycle: bool) -> Node | str | None:
+    if is_goal(puzzle, node.state):
+        return node
+    if limit == 0:
+        return CUTOFF
+
+    cutoff_occurred = False
+    for move in puzzle.get_moves(node.state):
+        child = child_node(puzzle, node, move)
+        if check_cycle and _is_cycle(child):
+            continue
+        result = _recursive_dls(puzzle, child, limit - 1, check_cycle)
+        if result == CUTOFF:
+            cutoff_occurred = True
+        elif result is not None:
+            return result
+    return CUTOFF if cutoff_occurred else None
+
+
+def DLS(puzzle: Problem, limit: int, check_cycle: bool = True) -> list[Any] | str | None:
+    """DLS đệ quy đúng mã giả (AIMA): trả về danh sách trạng thái lời giải, ``CUTOFF`` hoặc ``None`` (failure)."""
+    result = _recursive_dls(puzzle, Node(puzzle.start_state), limit, check_cycle)
+    return solution(result) if isinstance(result, Node) else result
+
+
+def IDS(puzzle: Problem, max_depth: int | None = None, check_cycle: bool = True) -> list[Any] | str | None:
+    """IDS: lặp DLS với giới hạn 0, 1, 2, ... đến khi kết quả khác ``CUTOFF`` (hoặc quá ``max_depth`` thì ``CUTOFF``)."""
+    for depth in count():
+        if max_depth is not None and depth > max_depth:
+            return CUTOFF
+        result = DLS(puzzle, depth, check_cycle)
+        if result != CUTOFF:
+            return result
     return None
 
 

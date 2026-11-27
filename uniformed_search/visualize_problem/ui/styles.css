@@ -765,3 +765,32 @@ body.present .debug-box { display: none; }
 .wf-worse { color: var(--rose); }
 .wf-diff { color: var(--amber); }
 body.present .whatif-box, body.present .whatif-hint { display: none; }
+
+:root { --orange: #c2410c; --orange-dot: #f97316; --orange-soft: #fff7ed; --orange-border: #fdba74; }
+:root[data-theme="dark"] { --orange: #fdba74; --orange-soft: rgba(249, 115, 22, 0.13); --orange-border: rgba(249, 115, 22, 0.45); }
+.pill-orange { background: var(--orange-soft); color: var(--orange); border-color: var(--orange-border); }
+.dot-orange { background: var(--orange-dot); }
+.code-line.active-amber { background: rgba(249, 115, 22, 0.3); border-left-color: #fb923c; color: #fff; }
+.code-line.active-amber .line-num { color: #e2e8f0; font-weight: 700; }
+
+.code-col > * { flex-shrink: 0; }
+
+.line-note { margin: 2px 14px 6px 40px; padding: 7px 11px; border-radius: 8px; font-family: var(--font-sans, inherit); font-size: calc(var(--fs-code) + 0.5px); line-height: 1.45; white-space: normal; color: #e2e8f0; background: rgba(99, 102, 241, 0.2); border-left: 3px solid #818cf8; }
+.line-note.note-rose { background: rgba(244, 63, 94, 0.2); border-left-color: #fb7185; }
+.line-note.note-amber { background: rgba(249, 115, 22, 0.2); border-left-color: #fb923c; }
+.line-note.note-emerald { background: rgba(16, 185, 129, 0.2); border-left-color: #34d399; }
+body.present .line-note { font-size: calc(var(--fs-code) + 2px); }
+
+.check-answer { margin-left: auto; min-width: 54px; text-align: center; padding: 2px 9px; border-radius: 999px; font-family: var(--font-mono); font-size: var(--fs-tiny); font-weight: 800; letter-spacing: 0.03em; background: var(--bg-subtle); color: var(--text-muted); border: 1px solid var(--border); }
+.check-row[data-state="pass"] .check-answer { background: var(--emerald-dot); color: #fff; border-color: var(--emerald-dot); }
+.check-row[data-state="fail"] .check-answer { background: var(--rose-dot); color: #fff; border-color: var(--rose-dot); }
+.check-row[data-state="skipped"] .check-answer { opacity: 0.7; text-decoration: none; }
+
+.depth-table { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; max-height: 420px; overflow-y: auto; scrollbar-width: thin; }
+.depth-row { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 10px; align-items: stretch; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-subtle); padding: 6px 8px; }
+.depth-row-active { border-color: var(--indigo-border); background: var(--indigo-soft); }
+.depth-head { display: flex; flex-direction: column; justify-content: center; gap: 2px; font-size: var(--fs-small); color: var(--text-secondary); }
+.depth-head strong { color: var(--text-primary); }
+.depth-head span { font-size: var(--fs-tiny); color: var(--text-muted); }
+.queue-strip.depth-strip { min-height: 88px; padding: 4px 2px 6px; }
+body.present .depth-table { max-height: none; }

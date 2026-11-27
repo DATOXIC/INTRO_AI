@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..core import ALGORITHMS, get_source_lines
+from ..core import ALGORITHMS, DEFAULT_DEPTH_LIMIT, MAX_DEPTH_LIMIT, get_source_lines
 from ..problems import PROBLEMS, get_presets, npuzzle, vacuum
 from ..problems.base import SolveOptions, parse_bool, parse_int
 
@@ -42,6 +42,7 @@ def _solve(payload: dict[str, Any]) -> dict[str, Any]:
         max_nodes=parse_int(payload.get("max_nodes"), "max_nodes", 300, 1, 3000),
         force_run=parse_bool(payload.get("force_run"), "force_run", False),
         edits=payload.get("program"),
+        depth_limit=parse_int(payload.get("depth_limit"), "depth_limit", DEFAULT_DEPTH_LIMIT, 0, MAX_DEPTH_LIMIT),
     )
     return PROBLEMS[problem_kind].solve(payload, options)
 

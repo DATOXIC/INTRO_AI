@@ -443,6 +443,7 @@ def solve(payload: dict[str, Any], options: SolveOptions) -> dict[str, Any]:
         early_goal_test=options.early_goal_test,
         max_nodes=options.max_nodes,
         edits=options.edits,
+        depth_limit=options.depth_limit,
     )
 
 

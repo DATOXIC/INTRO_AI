@@ -11,8 +11,12 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 Move = str
-ALGORITHMS = ("bfs", "dfs", "ucs", "ucs_fast")
+ALGORITHMS = ("bfs", "dfs", "ucs", "ucs_fast", "dls", "ids")
 UCS_ALGORITHMS = ("ucs", "ucs_fast")
+RECURSIVE_ALGORITHMS = ("dls", "ids")
+CUTOFF = "cutoff"
+DEFAULT_DEPTH_LIMIT = 3
+MAX_DEPTH_LIMIT = 30
 
 MAX_TRACE_ELEMENTS = 3_000_000
 

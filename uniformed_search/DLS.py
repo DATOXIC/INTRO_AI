@@ -25,6 +25,7 @@ def dls(initial_state, is_goal_func, get_successors_func, depth):
     frontier = []
     frontier.append(root)
     seen_state = {}
+
     seen_state[root.state] = 1
 
     while frontier:
@@ -62,3 +63,35 @@ def iddfs(initial_state, is_goal_func, get_successors_func, max_limit=100):
             return result
 
     return None
+
+
+
+
+def recursive_dls(cur_node, problem, limit, explored):
+    # 1. Đạt đích -> trả về đường đi ngay
+    if is_goal(problem, cur_node.state):
+        return cur_node.get_path()
+
+    # 2. Chạm trần giới hạn -> dừng nhánh này (cutoff)
+    if cur_node.depth >= limit:
+        return "cutoff"
+
+    cutoff_occurred = False
+
+    # 3. Thử từng nhánh con bằng cách gọi đệ quy
+    for action in problem.get_moves(cur_node.state):
+        next_state = problem.apply_move(cur_node.state, action)
+        child_depth = cur_node.depth + 1
+
+        if next_state not in explored or child_depth < explored[next_state]:
+            explored[next_state] = child_depth
+            child = Node(next_state, parent=cur_node, action=action, depth=child_depth)
+
+            result = recursive_dls(child, problem, limit, explored)
+            
+            if result == "cutoff":
+                cutoff_occurred = True
+            elif result is not None:
+                return result  # Tìm thấy đường đi -> thoát luôn
+
+    return "cutoff" if cutoff_occurred else None

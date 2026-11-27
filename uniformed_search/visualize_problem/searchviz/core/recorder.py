@@ -83,6 +83,7 @@ class Recorder:
         collision_id: int | None = None,
         solution_ids: list[int] | None = None,
         local_vars: dict[str, Any] | None = None,
+        extra: dict[str, Any] | None = None,
     ) -> int:
         if is_macro:
             self.macro_counter += 1
@@ -111,6 +112,7 @@ class Recorder:
                     "frontier_size": len(frontier_ids),
                     "explored_size": len(self.explored_order),
                 },
+                **(extra or {}),
             }
         )
         return step_idx

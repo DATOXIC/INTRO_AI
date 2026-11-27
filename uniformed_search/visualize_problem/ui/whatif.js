@@ -14,6 +14,7 @@
     solved: "Tìm thấy lời giải",
     failure: "Không tìm thấy (frontier cạn)",
     limit_reached: "Chạm giới hạn, chưa dừng",
+    cutoff: "Cutoff (chạm giới hạn độ sâu)",
     program_error: "Lỗi chương trình",
   };
 
@@ -114,9 +115,10 @@
     const box = $("whatifBox");
     const hint = $("whatifHint");
     if (!box) return;
+    const readOnly = Boolean(host() && host().isRecursive && host().isRecursive());
     if (!isEdited()) {
       box.classList.add("hidden");
-      if (hint) hint.classList.remove("hidden");
+      if (hint) hint.classList.toggle("hidden", readOnly);
       return;
     }
     box.classList.remove("hidden");

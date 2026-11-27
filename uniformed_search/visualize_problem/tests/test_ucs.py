@@ -312,7 +312,7 @@ class TestVacuumRooms(unittest.TestCase):
                     start = (robot, *dirt)
                     domain = make_vacuum_domain(start)
                     expected = dijkstra_cost(start, domain)
-                    for algorithm in ALGORITHMS:
+                    for algorithm in (a for a in ALGORITHMS if a != "dls"):
                         res = search_trace(domain, algorithm=algorithm, max_nodes=3000)
                         self.assertEqual(res["status"], "solved", msg=f"{algorithm} {start}")
                         self.assertEqual(res["rooms"], rooms)
@@ -402,7 +402,7 @@ class TestApi(unittest.TestCase):
     def test_presets_endpoint_lists_algorithms_and_room_counts(self) -> None:
         status, res = handle("GET", "/api/presets")
         self.assertEqual(status, 200)
-        self.assertEqual(res["algorithms"], ["bfs", "dfs", "ucs", "ucs_fast"])
+        self.assertEqual(res["algorithms"], ["bfs", "dfs", "ucs", "ucs_fast", "dls", "ids"])
         self.assertEqual(res["vacuum_rooms"], list(range(MIN_ROOMS, MAX_ROOMS + 1)))
 
 
